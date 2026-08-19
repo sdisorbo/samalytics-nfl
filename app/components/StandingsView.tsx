@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useMemo, useState } from "react";
 import { ELO, SEASONS, SEASON_LABEL, DEFAULT_SEASON, ODDS_STEPS, type Season, type EloTeam, type Odds } from "../lib/data";
-import { logoUrl, eloHeat, oddsHeat } from "../lib/teams";
+import { logoUrl, eloTextColor, oddsHeat } from "../lib/teams";
 
 type Mode = "all" | "division" | "wildcard";
 type SortKey = "win_pct" | "elo" | keyof Odds;
@@ -126,7 +126,6 @@ export default function StandingsView() {
                   )}
                   {sec.rows.map((r, ri) => {
                     const t = r.t;
-                    const heat = eloHeat(t.elo);
                     const cut = sec.cutAfter != null && ri === sec.cutAfter;
                     return (
                       <tr key={t.abbr} className={cut ? "cut-line" : undefined}>
@@ -143,7 +142,7 @@ export default function StandingsView() {
                         <td className="tabular">{t.record.w}-{t.record.l}{t.record.t ? `-${t.record.t}` : ""}</td>
                         <td>{t.win_pct.toFixed(3).replace(/^0/, "")}</td>
                         <td className="text-s-muted">{fmtGb(r.gb)}</td>
-                        <td className="font-bold" style={{ background: heat.bg, color: heat.fg }}>{t.elo.toFixed(0)}</td>
+                        <td className="font-bold" style={{ color: eloTextColor(t.elo) }}>{t.elo.toFixed(0)}</td>
                         {ODDS_STEPS.map((o) => <td key={o.key}>{oddsCell(t.odds[o.key], t.made)}</td>)}
                       </tr>
                     );

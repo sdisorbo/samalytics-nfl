@@ -1,4 +1,4 @@
-import EloView from "../components/EloView";
+import EloChart from "../components/EloChart";
 
 export const metadata = { title: "Elo Ratings | Samalytics NFL Engine" };
 
@@ -13,7 +13,7 @@ export default function Page() {
           mean each offseason. The shaded band is the league&apos;s min–max range.
         </p>
       </div>
-      <EloView />
+      <EloChart />
     </>
   );
 }

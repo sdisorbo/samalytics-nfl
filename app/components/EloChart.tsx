@@ -86,8 +86,8 @@ export default function EloChart({ season: ctrlSeason }: { season?: Season } = {
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
             <XAxis dataKey="date" tickFormatter={fmtDate} minTickGap={48}
               tick={{ fontSize: 11, fill: "var(--color-muted)" }} tickLine={false} axisLine={{ stroke: "var(--color-border)" }} />
-            <YAxis domain={["dataMin - 20", "dataMax + 20"]} tick={{ fontSize: 11, fill: "var(--color-muted)" }}
-              tickLine={false} axisLine={false} width={46} />
+            <YAxis domain={["dataMin - 20", "dataMax + 20"]} tickFormatter={(v: number) => `${Math.round(v)}`}
+              tick={{ fontSize: 11, fill: "var(--color-muted)" }} tickLine={false} axisLine={false} width={44} />
             <ReferenceLine y={1500} stroke="var(--color-muted)" strokeDasharray="5 5"
               label={{ value: "1500 avg", position: "insideBottomLeft", fontSize: 10, fill: "var(--color-muted)" }} />
             <Area type="monotone" dataKey="band" stroke="var(--color-muted)" strokeOpacity={0.55} strokeDasharray="4 4"

@@ -48,8 +48,7 @@ export default function Nav() {
         <ThemeToggle />
         <div className="h-5 w-px bg-s-border hidden sm:block" />
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <span className="grid place-items-center rounded-md text-white font-black" aria-hidden
-            style={{ width: 28, height: 28, backgroundColor: "var(--color-accent)", fontSize: "0.95rem" }}>N</span>
+          <img src="/samalytics_nfl_logo.png" alt="Samalytics NFL" width={30} height={30} className="object-contain" />
           <div className="flex flex-col leading-none">
             <span className="font-orbitron font-black tracking-wider" style={{ fontSize: "0.8rem", color: "var(--color-accent)" }}>SAMALYTICS</span>
             <span className="font-bold text-s-muted tracking-widest uppercase hidden sm:block" style={{ fontSize: "0.55rem" }}>NFL ENGINE</span>

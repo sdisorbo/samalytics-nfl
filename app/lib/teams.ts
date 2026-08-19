@@ -11,27 +11,16 @@ export function logoUrl(abbr: string): string {
   return TEAMS[abbr]?.logo ?? "";
 }
 
-// ── conditional-format heat scale ────────────────────────────────────────────
-// purple (low) → lavender (mid-low) → transparent (avg) → green (high),
-// anchored to the theme tokens so it reads in both light and dark mode.
-function mix(a: string, b: string, t: number): string {
-  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
-  const ch = (s: number) => [(s >> 16) & 255, (s >> 8) & 255, s & 255];
-  const [ar, ag, ab] = ch(pa), [br, bg, bb] = ch(pb);
-  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
-  return `rgb(${r},${g},${bl})`;
-}
-
-/** Background + text color for an Elo cell. Center ~1500; span ±160. */
-export function eloHeat(elo: number): { bg: string; fg: string } {
+// ── conditional-format scale ─────────────────────────────────────────────────
+// green above the mean, purple below, anchored to theme tokens so it reads in
+// both light and dark mode.
+/** Font color for an Elo number: green above the mean, purple below. Center ~1500; span ±160. */
+export function eloTextColor(elo: number): string {
   const t = Math.max(-1, Math.min(1, (elo - 1500) / 160));
-  if (t >= 0) {
-    const bg = mix("#FFFFFF", "#0B691C", t * 0.92);
-    return { bg, fg: t > 0.45 ? "#FFFFFF" : "var(--color-text)" };
-  }
-  // below average: lavender → purple as it drops
-  const bg = mix("#D4CBE5", "#BA61DA", Math.min(1, -t));
-  return { bg, fg: -t > 0.6 ? "#FFFFFF" : "#3A2540" };
+  if (Math.abs(t) < 0.05) return "var(--color-text)";
+  const intensity = Math.round((0.4 + 0.6 * Math.min(1, Math.abs(t))) * 100);
+  const anchor = t > 0 ? "var(--heat-green)" : "var(--heat-purple)";
+  return `color-mix(in srgb, ${anchor} ${intensity}%, var(--color-text))`;
 }
 
 /** Green fill for a probability cell (0..1). */
