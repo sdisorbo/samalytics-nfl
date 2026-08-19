@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── theme tokens ─────────────────────────────────────────────────────────
+   Brand green #0B691C. Conditional-format scale runs purple (#BA61DA) →
+   lavender (#D4CBE5) → green (#0B691C). Dark mode is a deep forest green.   */
+:root {
+  --font-inter: "Inter", system-ui, sans-serif;
+  --color-bg:       #FFFFFF;
+  --color-surface:  #FFFFFF;
+  --color-border:   #E5E7EB;
+  --color-text:     #111827;
+  --color-muted:    #6B7280;
+  --color-accent:   #0B691C;   /* brand green */
+  --color-hover:    #F5F8F5;
+
+  /* conditional-format anchors */
+  --heat-green:     #0B691C;
+  --heat-lav:       #D4CBE5;
+  --heat-purple:    #BA61DA;
+}
+
+:root[data-theme="dark"] {
+  --color-bg:       #071109;   /* deep forest green */
+  --color-surface:  #0E1D13;
+  --color-border:   #1F3325;
+  --color-text:     #E7F0E9;
+  --color-muted:    #8AA593;
+  --color-accent:   #2FB65E;   /* brighter green pops on dark green */
+  --color-hover:    #14271A;
+
+  --heat-green:     #1E9E4A;
+  --heat-lav:       #B79BD6;
+  --heat-purple:    #BA61DA;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+body { min-height: 100vh; }
+
+table, .tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ── 538-style data table ────────────────────────────────────────────────── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.data-table th {
+  text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.65rem; font-weight: 600;
+  color: var(--color-muted); border-bottom: 2px solid var(--color-border);
+  padding: 6px 8px; white-space: nowrap; cursor: pointer; user-select: none; text-align: right;
+}
+.data-table th:first-child, .data-table th.lft { text-align: left; }
+.data-table th:hover { color: var(--color-text); }
+.data-table td {
+  padding: 6px 8px; border-bottom: 1px solid var(--color-border); white-space: nowrap; text-align: right;
+}
+.data-table td.lft { text-align: left; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover td { background: var(--color-hover); }
+
+/* sticky first columns (rank + name/logo) so they lock while the row scrolls */
+.data-table th.stk, .data-table td.stk { position: sticky; background: var(--color-surface); z-index: 2; }
+.data-table .stk0 { left: 0; width: 30px; min-width: 30px; }
+.data-table .stk1 { left: 30px; box-shadow: 7px 0 7px -7px rgba(0,0,0,0.25); }
+.data-table tbody tr:hover td.stk { background: var(--color-hover); }
+
+/* group header rows (division / conference / cut lines) */
+.grp-row td {
+  background: var(--color-hover); padding: 7px 8px;
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+.cut-line td { border-top: 2px dashed var(--color-accent); }
+
+.section-heading {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--color-muted); margin-bottom: 6px;
+}
+.stat-card {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: 14px; padding: 16px;
+}
+.pill {
+  padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.03em; cursor: pointer; white-space: nowrap;
+  color: var(--color-muted); border: 1px solid transparent;
+}
+.pill.on { background: var(--color-accent); color: #fff; }
+.pill:not(.on):hover { color: var(--color-text); background: var(--color-hover); }
+
+.segment { display: inline-flex; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 2px; }
+.segment button {
+  border: 0; background: transparent; color: var(--color-muted); font-weight: 600; font-size: 0.68rem;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.segment button.on { background: var(--color-accent); color: #fff; }
+
+.ctl {
+  background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border);
+  border-radius: 8px; padding: 7px 10px; font-size: 0.78rem; font-weight: 500;
+}
+.ctl:focus { outline: none; border-color: var(--color-accent); }
+
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* recharts theming */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  border: 1px solid var(--color-border) !important; border-radius: 10px !important;
+  background: var(--color-surface) !important; color: var(--color-text) !important;
+  font-size: 0.75rem !important; box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+}
+:root[data-theme="dark"] .recharts-cartesian-grid line { stroke: var(--color-border) !important; }
+:root[data-theme="dark"] .recharts-cartesian-axis-tick text { fill: var(--color-muted) !important; }
