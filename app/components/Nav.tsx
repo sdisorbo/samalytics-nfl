@@ -7,6 +7,7 @@ import clsx from "clsx";
 const LINKS = [
   { href: "/", label: "Standings" },
   { href: "/elo", label: "Elo Ratings" },
+  { href: "/fantasy", label: "Fantasy WAR" },
 ];
 
 function ThemeToggle() {

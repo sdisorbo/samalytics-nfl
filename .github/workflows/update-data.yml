@@ -59,7 +59,9 @@ jobs:
 
       - name: Rebuild data
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
-        run: python scripts/build_data.py
+        run: |
+          python scripts/build_data.py
+          python scripts/build_fantasy.py
 
       - name: Commit & push if changed
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
