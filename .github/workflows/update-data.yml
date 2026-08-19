@@ -1,0 +1,75 @@
+name: Update NFL data
+
+# Rebuilds data/*.json from live nflverse data and commits any changes.
+# Runs on a game-week cadence, but ONLY during football season (Sep–Feb) — the
+# in-season gate below no-ops the job the rest of the year.
+#
+# GitHub Actions cron is UTC-only. Times below are tuned to Eastern STANDARD
+# time (UTC-5), which covers Nov–Feb and the whole postseason; in Sep/Oct
+# (Eastern DAYLIGHT time) each run lands ~1 hour later in ET, which is fine for
+# a data refresh. "Night" runs are set for ~1 AM ET, after that day's games end.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 6 * * 2'     # Mon night   -> Tue 1:00 AM ET (after MNF)
+    - cron: '0 14 * * 2'    # Tue morning ->     9:00 AM ET
+    - cron: '0 6 * * 5'     # Thu night   -> Fri 1:00 AM ET (after TNF)
+    - cron: '0 14 * * 5'    # Fri morning ->     9:00 AM ET
+    - cron: '0 6 * * 0'     # Sat night   -> Sun 1:00 AM ET (after SAT games)
+    - cron: '30 21 * * 0'   # Sun         ->     4:30 PM ET
+    - cron: '0 1 * * 1'     # Sun         ->     8:00 PM ET
+    - cron: '0 5 * * 1'     # Sun midnight->    12:00 AM ET (after SNF)
+    - cron: '0 14 * * 1'    # Mon morning ->     9:00 AM ET
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: In football season? (Sep–Feb, Eastern)
+        id: gate
+        run: |
+          m=$(TZ=America/New_York date +%m)
+          if [[ "$m" =~ ^(09|10|11|12|01|02)$ ]]; then
+            echo "in_season=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "in_season=false" >> "$GITHUB_OUTPUT"
+            echo "Out of season (month $m ET) — skipping."
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        run: pip install -r scripts/requirements.txt
+
+      - name: Rebuild data
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        run: python scripts/build_data.py
+
+      - name: Commit & push if changed
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data; then
+            echo "No data changes."
+          else
+            git add data
+            git commit -m "Auto-update NFL data ($(TZ=America/New_York date '+%Y-%m-%d %H:%M ET'))"
+            git push
+          fi

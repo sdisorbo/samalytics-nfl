@@ -37,7 +37,10 @@ import numpy as np
 import nflreadpy as nfl
 
 # ── model constants ─────────────────────────────────────────────────────────
-SEASONS   = [2021, 2022, 2023, 2024, 2025]
+# Seasons run from 2021 through whatever nflverse considers the current season,
+# so the scheduled refresh auto-picks-up a new season once it kicks off.
+FIRST_SEASON = 2021
+SEASONS   = list(range(FIRST_SEASON, nfl.get_current_season() + 1))
 BASE      = 1500.0     # league average
 K         = 20.0       # update speed
 HFA       = 48.0       # home-field advantage, in Elo points
