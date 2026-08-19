@@ -22,13 +22,13 @@
 }
 
 :root[data-theme="dark"] {
-  --color-bg:       #030A05;   /* deep forest green */
-  --color-surface:  #08130C;
-  --color-border:   #17291D;
+  --color-bg:       #030A05;   /* deep forest green page */
+  --color-surface:  #13241A;   /* lighter than the page so cards/tables lift off it */
+  --color-border:   #263B2E;
   --color-text:     #E7F0E9;
-  --color-muted:    #83A08C;
+  --color-muted:    #8BA894;
   --color-accent:   #2FB65E;   /* brighter green pops on dark green */
-  --color-hover:    #0E1D13;
+  --color-hover:    #1D3325;
 
   --heat-green:     #1E9E4A;
   --heat-lav:       #B79BD6;
