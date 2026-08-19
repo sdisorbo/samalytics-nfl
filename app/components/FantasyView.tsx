@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   computeWar, FANTASY_SEASONS, FANTASY_DEFAULT_SEASON, FANTASY_UPDATED,
   DEFAULT_SETTINGS, POSITIONS,
@@ -39,6 +39,86 @@ function Spark({ top, all }: { top: number[]; all: number[] }) {
   );
 }
 
+// ── player detail modal: yearly WAR vs the positional average ────────────────
+function PlayerModal({ row, seasons, playerWar, avgWar, onClose }:
+  { row: FantasyRow; seasons: string[]; playerWar: (number | null)[]; avgWar: number[]; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const W = 480, H = 264, L = 34, RM = 14, T = 30, B = 26;
+  const n = seasons.length;
+  const present = playerWar.map((v, i) => ({ i, v })).filter((p): p is { i: number; v: number } => p.v != null);
+  const vals = [...present.map((p) => p.v), ...avgWar, 0];
+  let dmin = Math.min(...vals), dmax = Math.max(...vals);
+  const pad = (dmax - dmin) * 0.14 || 0.2; dmin -= pad; dmax += pad;
+  const sx = (i: number) => L + (W - L - RM) * (n <= 1 ? 0.5 : i / (n - 1));
+  const sy = (v: number) => (H - B) - (H - B - T) * ((v - dmin) / ((dmax - dmin) || 1));
+
+  const runs: { i: number; v: number }[][] = [];
+  let cur: { i: number; v: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    if (playerWar[i] != null) cur.push({ i, v: playerWar[i] as number });
+    else if (cur.length) { runs.push(cur); cur = []; }
+  }
+  if (cur.length) runs.push(cur);
+
+  const line = (pts: { i: number; v: number }[]) => pts.map((p, k) => `${k ? "L" : "M"}${sx(p.i).toFixed(1)} ${sy(p.v).toFixed(1)}`).join(" ");
+  const band = (pts: { i: number; v: number }[]) => {
+    const fwd = pts.map((p) => `${sx(p.i).toFixed(1)} ${sy(p.v).toFixed(1)}`);
+    const back = [...pts].reverse().map((p) => `${sx(p.i).toFixed(1)} ${sy(avgWar[p.i]).toFixed(1)}`);
+    return `M${fwd.join(" L ")} L ${back.join(" L ")} Z`;
+  };
+  const avgPath = avgWar.map((v, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)} ${sy(v).toFixed(1)}`).join(" ");
+  const zeroIn = dmin < 0 && dmax > 0;
+  const color = "var(--color-accent)";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={onClose}>
+      <div className="stat-card w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-2">
+          <img src={row.pos === "DST" ? logoUrl(row.team) : (row.hs || logoUrl(row.team))} alt={row.team}
+            width={44} height={44} className="rounded-full object-contain shrink-0" style={{ width: 44, height: 44, background: "#fff" }} />
+          <div className="min-w-0">
+            <div className="font-black text-lg leading-tight truncate">{row.name}</div>
+            <div className="text-2xs text-s-muted uppercase tracking-wide">{row.pos} · {row.team}</div>
+          </div>
+          <button onClick={onClose} aria-label="Close"
+            className="ml-auto w-8 h-8 rounded-full text-s-muted hover:text-s-text hover:bg-s-hover shrink-0">✕</button>
+        </div>
+        <div className="flex items-center gap-4 text-2xs text-s-muted mb-1">
+          <span className="inline-flex items-center gap-1.5"><span style={{ width: 14, height: 2, background: color, display: "inline-block" }} /> Player WAR</span>
+          <span className="inline-flex items-center gap-1.5"><span style={{ width: 14, borderTop: "2px dotted var(--color-muted)", display: "inline-block" }} /> {row.pos} avg</span>
+        </div>
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+          {zeroIn && <line x1={L} x2={W - RM} y1={sy(0)} y2={sy(0)} stroke="var(--color-border)" strokeWidth={1} />}
+          <text x={2} y={sy(dmax) + 3} fontSize="9" fill="var(--color-muted)">{dmax.toFixed(1)}</text>
+          <text x={2} y={sy(dmin) + 3} fontSize="9" fill="var(--color-muted)">{dmin.toFixed(1)}</text>
+          {runs.filter((r) => r.length > 1).map((r, idx) => <path key={`b${idx}`} d={band(r)} fill="var(--color-muted)" opacity={0.22} />)}
+          {runs.filter((r) => r.length === 1).map((r, idx) => (
+            <line key={`g${idx}`} x1={sx(r[0].i)} x2={sx(r[0].i)} y1={sy(r[0].v)} y2={sy(avgWar[r[0].i])} stroke="var(--color-muted)" strokeWidth={6} opacity={0.22} />
+          ))}
+          <path d={avgPath} fill="none" stroke="var(--color-muted)" strokeWidth={1.5} strokeDasharray="3 3" />
+          {runs.map((r, idx) => <path key={`l${idx}`} d={line(r)} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" />)}
+          {present.map((p) => (
+            <g key={`d${p.i}`}>
+              <circle cx={sx(p.i)} cy={sy(p.v)} r={3.5} fill={color} />
+              <text x={sx(p.i)} y={sy(p.v) - 7} fontSize="9.5" fontWeight="700" textAnchor="middle" fill="var(--color-text)">{p.v.toFixed(2)}</text>
+            </g>
+          ))}
+          {seasons.map((s, i) => <text key={s} x={sx(i)} y={H - 7} fontSize="10" textAnchor="middle" fill="var(--color-muted)">{s}</text>)}
+        </svg>
+        <p className="text-2xs text-s-muted mt-2 leading-relaxed">
+          Yearly WAR against the {row.pos} average (dotted). The shaded area is this player&apos;s edge over an
+          average {row.pos} each season.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // small labelled number input
 function Num({ label, value, step = 1, onChange, w = 60 }:
   { label: string; value: number; step?: number; onChange: (v: number) => void; w?: number }) {
@@ -63,6 +143,7 @@ export default function FantasyView() {
   const [minG, setMinG] = useState(0);
   const [sortKey, setSortKey] = useState<SortKey>("war");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [selected, setSelected] = useState<FantasyRow | null>(null);
 
   const setScoring = (patch: Partial<Scoring>) =>
     setSettings((s) => ({ ...s, scoring: { ...s.scoring, ...patch } }));
@@ -71,12 +152,13 @@ export default function FantasyView() {
   const setTier = (i: number, pts: number) =>
     setSettings((s) => ({ ...s, scoring: { ...s.scoring, paTiers: s.scoring.paTiers.map((t, j) => j === i ? { ...t, pts } : t) } }));
 
+  // every season's WAR board (recompute only when scoring/roster change) — powers
+  // the current-season table, the trend sparklines, and the player modal
+  const perSeason = useMemo(() => FANTASY_SEASONS.map((s) => computeWar(s, settings)), [settings]);
   const all = useMemo(() => computeWar(season, settings), [season, settings]);
   const teams = useMemo(() => Array.from(new Set(all.map((r) => r.team))).sort(), [all]);
 
-  // per-position WAR trends across every season (recompute when scoring changes)
   const trends = useMemo(() => {
-    const perSeason = FANTASY_SEASONS.map((s) => computeWar(s, settings));
     const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
     return POSITIONS.map((pos) => {
       const top: number[] = [], avg: number[] = [];
@@ -87,7 +169,15 @@ export default function FantasyView() {
       }
       return { pos, top, avg };
     });
-  }, [settings]);
+  }, [perSeason]);
+
+  // selected player's WAR across all seasons + that position's average line
+  const detail = useMemo(() => {
+    if (!selected) return null;
+    const playerWar = perSeason.map((rows) => rows.find((r) => r.id === selected.id)?.war ?? null);
+    const avg = trends.find((t) => t.pos === selected.pos)?.avg ?? [];
+    return { playerWar, avg };
+  }, [selected, perSeason, trends]);
 
   const rows = useMemo(() => {
     let rs = all;
@@ -288,7 +378,7 @@ export default function FantasyView() {
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={r.id}>
+                <tr key={r.id} onClick={() => setSelected(r)} style={{ cursor: "pointer" }}>
                   <td className="lft text-s-muted stk stk0">{i + 1}</td>
                   <td className="lft stk stk1">
                     <span className="inline-flex items-center gap-2.5 font-semibold">
@@ -325,7 +415,11 @@ export default function FantasyView() {
           </table>
         </div>
       </div>
-      <p className="text-2xs text-s-muted mt-2">Data through {FANTASY_UPDATED}. {rows.length} players shown.</p>
+      <p className="text-2xs text-s-muted mt-2">Data through {FANTASY_UPDATED}. {rows.length} players shown. Tap a player for their yearly WAR.</p>
+
+      {selected && detail && (
+        <PlayerModal row={selected} seasons={FANTASY_SEASONS} playerWar={detail.playerWar} avgWar={detail.avg} onClose={() => setSelected(null)} />
+      )}
     </>
   );
 }
