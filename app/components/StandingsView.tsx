@@ -28,6 +28,7 @@ export default function StandingsView() {
   const [season, setSeason] = useState<Season>(DEFAULT_SEASON);
   const [mode, setMode] = useState<Mode>("all");
   const [sortKey, setSortKey] = useState<SortKey>("win_pct");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const data = ELO[season];
 
   const sections = useMemo<Section[]>(() => {
@@ -69,15 +70,24 @@ export default function StandingsView() {
       sortKey === "win_pct" || sortKey === "elo"
         ? (t[sortKey] as number)
         : (t.odds[sortKey] as number);
-    const rows = teams.slice().sort((a, b) => get(b) - get(a) || byWL(a, b));
+    const rows = teams.slice().sort((a, b) => {
+      const d = get(a) - get(b);
+      if (d) return sortDir === "desc" ? -d : d;
+      return byWL(a, b);
+    });
     const lead = rows.slice().sort(byWL)[0];
     return [{ title: null, rows: rows.map((t, i) => ({ t, rank: String(i + 1), gb: gb(lead, t) })) }];
-  }, [data, mode, sortKey]);
+  }, [data, mode, sortKey, sortDir]);
 
   const sortable = mode === "all";
+  function clickSort(k: SortKey) {
+    if (k === sortKey) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    else { setSortKey(k); setSortDir("desc"); }
+  }
+  const arrow = (k: SortKey) => (sortable && sortKey === k ? (sortDir === "desc" ? " ↓" : " ↑") : "");
   const th = (k: SortKey, label: string) => (
-    <th onClick={sortable ? () => setSortKey(k) : undefined} style={{ cursor: sortable ? "pointer" : "default" }}>
-      {label}{sortable && sortKey === k ? " ↓" : ""}
+    <th onClick={sortable ? () => clickSort(k) : undefined} style={{ cursor: sortable ? "pointer" : "default" }}>
+      {label}{arrow(k)}
     </th>
   );
 
@@ -111,9 +121,9 @@ export default function StandingsView() {
                 <th style={{ cursor: "default" }}>GB</th>
                 {th("elo", "Elo")}
                 {ODDS_STEPS.map((o) => (
-                  <th key={o.key} onClick={sortable ? () => setSortKey(o.key) : undefined}
+                  <th key={o.key} onClick={sortable ? () => clickSort(o.key) : undefined}
                     style={{ cursor: sortable ? "pointer" : "default" }}>
-                    {o.label}{sortable && sortKey === o.key ? " ↓" : ""}
+                    {o.label}{arrow(o.key)}
                   </th>
                 ))}
               </tr>
