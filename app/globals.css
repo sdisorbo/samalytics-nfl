@@ -22,13 +22,13 @@
 }
 
 :root[data-theme="dark"] {
-  --color-bg:       #071109;   /* deep forest green */
-  --color-surface:  #0E1D13;
-  --color-border:   #1F3325;
+  --color-bg:       #030A05;   /* deep forest green */
+  --color-surface:  #08130C;
+  --color-border:   #17291D;
   --color-text:     #E7F0E9;
-  --color-muted:    #8AA593;
+  --color-muted:    #83A08C;
   --color-accent:   #2FB65E;   /* brighter green pops on dark green */
-  --color-hover:    #14271A;
+  --color-hover:    #0E1D13;
 
   --heat-green:     #1E9E4A;
   --heat-lav:       #B79BD6;
