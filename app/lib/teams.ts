@@ -23,24 +23,11 @@ export function eloTextColor(elo: number): string {
   return `color-mix(in srgb, ${anchor} ${intensity}%, var(--color-text))`;
 }
 
-// interpolate across the conditional-format ramp: purple → lavender → green
-const RAMP: [number, number, number, number][] = [
-  [0.0, 0xba, 0x61, 0xda], // purple  (low odds)
-  [0.5, 0xd4, 0xcb, 0xe5], // lavender (mid)
-  [1.0, 0x0b, 0x69, 0x1c], // green   (high odds)
-];
-function ramp(x: number): [number, number, number] {
-  const a = Math.max(0, Math.min(1, x));
-  let i = 1;
-  while (i < RAMP.length - 1 && a > RAMP[i][0]) i++;
-  const [p0, r0, g0, b0] = RAMP[i - 1], [p1, r1, g1, b1] = RAMP[i];
-  const t = (a - p0) / (p1 - p0);
-  return [Math.round(r0 + (r1 - r0) * t), Math.round(g0 + (g1 - g0) * t), Math.round(b0 + (b1 - b0) * t)];
-}
-
-/** Probability cell fill (0..1) on the purple→lavender→green scale. */
+/** Green fill for a probability cell (0..1). */
 export function oddsHeat(x: number): { bg: string; fg: string } {
-  const [r, g, b] = ramp(x);
-  const lum = 0.299 * r + 0.587 * g + 0.114 * b; // pick readable text
-  return { bg: `rgb(${r},${g},${b})`, fg: lum > 150 ? "#2E1836" : "#fff" };
+  const a = Math.max(0, Math.min(1, x));
+  return {
+    bg: `color-mix(in srgb, var(--heat-green) ${Math.round(a * 78)}%, transparent)`,
+    fg: a > 0.5 ? "#fff" : "var(--color-text)",
+  };
 }
