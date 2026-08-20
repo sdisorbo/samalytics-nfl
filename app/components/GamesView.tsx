@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import {
   GAMES, GAMES_SEASONS, GAMES_UPDATED, weeksFor, defaultWeek, defaultSeason, fmtTime, fmtDay, type Game,
 } from "../lib/games";
-import { logoUrl, TEAMS } from "../lib/teams";
+import { logoUrl, teamColor, TEAMS } from "../lib/teams";
 
 const teamName = (abbr: string) => TEAMS[abbr]?.name ?? abbr;
 
@@ -52,13 +52,16 @@ function GameCard({ g }: { g: Game }) {
         <span>{played ? "Final" : "Win probability"}</span>
       </div>
       <TeamRow abbr={g.away} elo={g.ae} pct={awayPct} win={g.aWin} loss={g.aLoss} score={g.as} isHome={false} played={played} isTop={!homeTop} />
-      {/* win-prob bar */}
-      {!played && (
-        <div className="h-1 rounded-full overflow-hidden my-0.5 flex" style={{ background: "var(--color-border)" }}>
-          <div style={{ width: `${awayPct}%`, background: "var(--color-muted)" }} />
-          <div style={{ width: `${homePct}%`, background: "var(--color-accent)" }} />
-        </div>
-      )}
+      {/* win-prob bar — favored team's slice in their color, underdog's muted */}
+      {!played && (() => {
+        const favColor = teamColor(homeTop ? g.home : g.away);
+        return (
+          <div className="h-1 rounded-full overflow-hidden my-0.5 flex" style={{ background: "var(--color-border)" }}>
+            <div style={{ width: `${awayPct}%`, background: homeTop ? "var(--color-border)" : favColor }} />
+            <div style={{ width: `${homePct}%`, background: homeTop ? favColor : "var(--color-border)" }} />
+          </div>
+        );
+      })()}
       <TeamRow abbr={g.home} elo={g.he} pct={homePct} win={g.hWin} loss={g.hLoss} score={g.hs} isHome={true} played={played} isTop={homeTop} />
     </div>
   );

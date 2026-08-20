@@ -1,10 +1,23 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
 import { ELO, SEASONS, SEASON_LABEL, DEFAULT_SEASON, type Season } from "../lib/data";
-import { teamColor } from "../lib/teams";
+import { teamColor, teamColorDark } from "../lib/teams";
+
+// track the active theme so the lines can switch to team secondary colors in dark mode
+function useIsDark() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const read = () => setDark(document.documentElement.getAttribute("data-theme") === "dark");
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
+}
 
 function fmtDate(d: string) {
   const [, m, day] = d.split("-");
@@ -24,6 +37,8 @@ export default function EloChart({ season: ctrlSeason }: { season?: Season } = {
   const season = ctrlSeason ?? ownSeason;
   const controlled = ctrlSeason != null;
   const data = ELO[season];
+  const dark = useIsDark();
+  const lineColor = (abbr: string) => (dark ? teamColorDark(abbr) : teamColor(abbr));
   // order the toggle chips by end-of-season Elo (teams array is already sorted)
   const ordered = useMemo(() => data.teams.map((t) => t.abbr), [data]);
   const [sel, setSel] = useState<Set<string>>(() => new Set(data.teams.slice(0, 1).map((t) => t.abbr)));
@@ -51,7 +66,7 @@ export default function EloChart({ season: ctrlSeason }: { season?: Season } = {
   }
   const endDot = (abbr: string) => (props: { cx?: number; cy?: number; index?: number }) =>
     props.index === lastIdx && props.cx != null
-      ? <circle key={abbr} cx={props.cx} cy={props.cy} r={4.5} fill="#fff" stroke={teamColor(abbr)} strokeWidth={2} />
+      ? <circle key={abbr} cx={props.cx} cy={props.cy} r={4.5} fill="#fff" stroke={lineColor(abbr)} strokeWidth={2} />
       : <g key={`${abbr}-${props.index}`} />;
 
   return (
@@ -73,7 +88,7 @@ export default function EloChart({ season: ctrlSeason }: { season?: Season } = {
           <button key={abbr} onClick={() => toggle(abbr)}
             className="text-2xs font-semibold px-2 py-1 rounded border transition-colors"
             style={sel.has(abbr)
-              ? { background: teamColor(abbr), color: "#fff", borderColor: teamColor(abbr) }
+              ? { background: lineColor(abbr), color: "#fff", borderColor: lineColor(abbr) }
               : { borderColor: "var(--color-border)", color: "var(--color-muted)" }}>
             {abbr}
           </button>
@@ -93,7 +108,7 @@ export default function EloChart({ season: ctrlSeason }: { season?: Season } = {
             <Area type="monotone" dataKey="band" stroke="var(--color-muted)" strokeOpacity={0.55} strokeDasharray="4 4"
               strokeWidth={1.25} fill="var(--color-muted)" fillOpacity={0.14} isAnimationActive={false} activeDot={false} />
             {[...sel].map((abbr) => (
-              <Line key={abbr} type="monotone" dataKey={abbr} stroke={teamColor(abbr)} strokeWidth={2.5}
+              <Line key={abbr} type="monotone" dataKey={abbr} stroke={lineColor(abbr)} strokeWidth={2.5}
                 dot={endDot(abbr)} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
             ))}
             <Tooltip labelFormatter={(d) => String(d)}

@@ -85,9 +85,11 @@ def load_team_meta(season_abbrs):
         if ab not in season_abbrs:
             continue
         color = r["team_color"] if isinstance(r["team_color"], str) and r["team_color"].startswith("#") else "#0B691C"
+        color2 = r["team_color2"] if isinstance(r["team_color2"], str) and r["team_color2"].startswith("#") else color
         meta[ab] = {
             "name": r["team_name"],
             "color": color,
+            "color2": color2,
             "logo": r["team_logo_espn"],
             "conf": r["team_conf"],
             "division": r["team_division"],
