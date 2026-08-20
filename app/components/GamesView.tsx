@@ -4,8 +4,27 @@ import {
   GAMES, GAMES_SEASONS, GAMES_UPDATED, weeksFor, defaultWeek, defaultSeason, fmtTime, fmtDay, type Game,
 } from "../lib/games";
 import { logoUrl, teamColor, TEAMS } from "../lib/teams";
+import { copyGameCard } from "../lib/shareCard";
 
 const teamName = (abbr: string) => TEAMS[abbr]?.name ?? abbr;
+
+function CopyPngButton({ g }: { g: Game }) {
+  const [state, setState] = useState<"" | "working" | "copied" | "saved">("");
+  async function go(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (state === "working") return;
+    setState("working");
+    try { setState(await copyGameCard(g)); } catch { setState(""); }
+    setTimeout(() => setState(""), 1800);
+  }
+  const label = state === "copied" ? "Copied ✓" : state === "saved" ? "Saved ✓" : state === "working" ? "…" : "⧉ PNG";
+  return (
+    <button onClick={go} title="Copy this matchup as an image"
+      className="text-2xs font-semibold px-2 py-0.5 rounded border border-s-border text-s-muted hover:text-s-text hover:bg-s-hover transition-colors">
+      {label}
+    </button>
+  );
+}
 
 function swing(win: number, loss: number) {
   return (
@@ -47,9 +66,12 @@ function GameCard({ g }: { g: Game }) {
   const awayPct = 100 - homePct;
   return (
     <div className="stat-card !p-3">
-      <div className="flex items-center justify-between text-2xs text-s-muted mb-1">
-        <span>{fmtTime(g.time)}{g.neutral ? " · neutral site" : ""}</span>
-        <span>{played ? "Final" : "Win probability"}</span>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-2xs text-s-muted">{fmtTime(g.time)}{g.neutral ? " · neutral site" : ""}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-2xs text-s-muted">{played ? "Final" : "Win probability"}</span>
+          <CopyPngButton g={g} />
+        </div>
       </div>
       <TeamRow abbr={g.away} elo={g.ae} pct={awayPct} win={g.aWin} loss={g.aLoss} score={g.as} isHome={false} played={played} isTop={!homeTop} />
       {/* win-prob bar — favored team's slice in their color, underdog's muted */}
