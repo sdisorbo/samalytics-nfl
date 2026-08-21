@@ -22,7 +22,9 @@ import numpy as np
 import pandas as pd
 import nflreadpy as nfl
 
-FIRST = 2021
+STAT_FIRST = 1999   # full career season stats (player_stats goes back to 1999)
+SNAP_FIRST = 2013   # snap counts start 2013
+MAP_FIRST = 2021    # pbp-based receiving/rushing maps (play-by-play is heavy)
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 PUB = ROOT / "public"
@@ -83,7 +85,6 @@ def season_stat_row(g, rows):
 
 def main():
     cur = nfl.get_current_season()
-    seasons = list(range(FIRST, cur + 1))
 
     print("loading identities…")
     pl = nfl.load_players().to_pandas()
@@ -101,54 +102,60 @@ def main():
             pfr2gsis[r["pfr_id"]] = gid
 
     players = defaultdict(lambda: {"seasons": {}})   # gid -> {seasons: {yr: {...}}}
-    targets = defaultdict(dict)                       # gid -> {yr: [[lane,ay,catch,epa],...]}
-    rushes = defaultdict(dict)                        # gid -> {yr: {gap: [att,yds,epaSum]}}
+    targets = defaultdict(dict)                       # gid -> {yr: [[lane,ay,catch,epa,yds],...]}
+    rushes = defaultdict(dict)                        # gid -> {yr: {gap: [att,yds,epaSum,stuffed]}}
 
-    for season in seasons:
+    # ── full-career season stats (player_stats back to 1999) ─────────────────
+    for season in range(STAT_FIRST, cur + 1):
         ps = nfl.load_player_stats(seasons=[season]).to_pandas()
         ps = ps[ps["season_type"] == "REG"]
         for gid, rows in ps.groupby("player_id"):
-            if not isinstance(gid, str) or gid not in ident:
-                if isinstance(gid, str):
-                    ident[gid] = {"name": rows["player_display_name"].iloc[-1],
-                                  "pos": rows["position"].iloc[-1] if isinstance(rows["position"].iloc[-1], str) else "",
-                                  "hs": "", "team": ""}
-                else:
-                    continue
+            if not isinstance(gid, str):
+                continue
+            if gid not in ident:
+                ident[gid] = {"name": rows["player_display_name"].iloc[-1],
+                              "pos": rows["position"].iloc[-1] if isinstance(rows["position"].iloc[-1], str) else "",
+                              "hs": "", "team": ""}
             gpos = ident[gid]["pos"] or (rows["position"].iloc[-1] if isinstance(rows["position"].iloc[-1], str) else "")
-            g = grp(gpos)
-            team = rows["team"].mode().iloc[0] if len(rows["team"].mode()) else ident[gid]["team"]
-            row = season_stat_row(g, rows)
+            row = season_stat_row(grp(gpos), rows)
+            row = {k: v for k, v in row.items() if v or k == "g"}   # drop zeros to stay lean
             players[gid]["seasons"][str(season)] = row
-            players[gid]["_team"] = team
+            players[gid]["_team"] = rows["team"].mode().iloc[0] if len(rows["team"].mode()) else ident[gid]["team"]
             hs = rows["headshot_url"].dropna()
             if not ident[gid]["hs"] and len(hs):
                 ident[gid]["hs"] = hs.iloc[-1]
+        if season % 4 == 0:
+            nfl.clear_cache()
+    print(f"  career stats: {STAT_FIRST}-{cur}")
 
-        # snaps (join via pfr id)
+    # ── snaps (2013+, join via pfr id) ───────────────────────────────────────
+    for season in range(SNAP_FIRST, cur + 1):
         sc = nfl.load_snap_counts(seasons=[season]).to_pandas()
         sc = sc[sc["game_type"] == "REG"]
         snap = sc.groupby("pfr_player_id").agg(o=("offense_snaps", "sum"), d=("defense_snaps", "sum"),
                                                st=("st_snaps", "sum"), team=("team", lambda x: x.mode().iloc[0])).reset_index()
+        yr = str(season)
         for _, r in snap.iterrows():
             gid = pfr2gsis.get(r["pfr_player_id"])
-            if not gid:
+            if not gid or gid not in ident:
                 continue
-            if gid not in ident:
-                continue
-            yr = str(season)
             if yr not in players[gid]["seasons"]:
                 players[gid]["seasons"][yr] = {"g": 0}
                 players[gid]["_team"] = r["team"]
-            players[gid]["seasons"][yr].update(osnp=r0(r["o"]), dsnp=r0(r["d"]), stsnp=r0(r["st"]))
-            players[gid].setdefault("_team", r["team"])
+            for k, v in (("osnp", r0(r["o"])), ("dsnp", r0(r["d"])), ("stsnp", r0(r["st"]))):
+                if v:
+                    players[gid]["seasons"][yr][k] = v
+    nfl.clear_cache()
 
-        # play-by-play: receiving targets + rushing by gap
+    # ── receiving/rushing field maps (pbp, 2021+; cache cleared each season) ──
+    lane = {"left": 0, "middle": 1, "right": 2}
+    gapmap = {("left", "end"): "LE", ("left", "tackle"): "LT", ("left", "guard"): "LG",
+              ("right", "end"): "RE", ("right", "tackle"): "RT", ("right", "guard"): "RG"}
+    for season in range(MAP_FIRST, cur + 1):
         pbp = nfl.load_pbp(seasons=[season]).to_pandas()
         yr = str(season)
         pas = pbp[(pbp["play_type"] == "pass") & pbp["receiver_player_id"].notna()
                   & pbp["air_yards"].notna() & pbp["pass_location"].isin(["left", "middle", "right"])]
-        lane = {"left": 0, "middle": 1, "right": 2}
         by_rec = defaultdict(list)
         for _, p in pas.iterrows():
             by_rec[p["receiver_player_id"]].append(
@@ -159,24 +166,22 @@ def main():
                 targets[gid][yr] = arr
 
         run = pbp[(pbp["play_type"] == "run") & pbp["rusher_player_id"].notna()]
-        gapmap = {("left", "end"): "LE", ("left", "tackle"): "LT", ("left", "guard"): "LG",
-                  ("right", "end"): "RE", ("right", "tackle"): "RT", ("right", "guard"): "RG"}
-        by_rush = defaultdict(lambda: defaultdict(lambda: [0, 0, 0.0]))
+        by_rush = defaultdict(lambda: defaultdict(lambda: [0, 0, 0.0, 0]))
         for _, p in run.iterrows():
             loc, gp = p["run_location"], p["run_gap"]
             if loc == "middle" or not isinstance(loc, str):
                 key = "M"
             else:
                 key = gapmap.get((loc, gp if isinstance(gp, str) else "tackle"), f"{loc[0].upper()}T")
+            yg = r0(p["yards_gained"])
             b = by_rush[p["rusher_player_id"]][key]
-            b[0] += 1; b[1] += r0(p["yards_gained"]); b[2] += (0.0 if pd.isna(p["epa"]) else float(p["epa"]))
+            b[0] += 1; b[1] += yg; b[2] += (0.0 if pd.isna(p["epa"]) else float(p["epa"])); b[3] += int(yg <= 0)
         for gid, gaps in by_rush.items():
             if isinstance(gid, str) and sum(v[0] for v in gaps.values()) >= 20:
-                rushes[gid][yr] = {k: [v[0], v[1], round(v[2], 1)] for k, v in gaps.items()}
+                rushes[gid][yr] = {k: [v[0], v[1], round(v[2], 1), v[3]] for k, v in gaps.items()}
 
-        nfl.clear_cache()   # drop this season's downloads before the next
-        print(f"  {season}: {len(ps.player_id.unique())} stat players, "
-              f"{sum(1 for g in targets if yr in targets[g])} receivers, "
+        nfl.clear_cache()
+        print(f"  {season}: {sum(1 for g in targets if yr in targets[g])} receivers, "
               f"{sum(1 for g in rushes if yr in rushes[g])} rushers")
 
     # assemble outputs
@@ -185,13 +190,17 @@ def main():
         if not rec["seasons"]:
             continue
         info = ident.get(gid, {"name": gid, "pos": "", "hs": ""})
+        name = info["name"] if isinstance(info["name"], str) and info["name"] else None
+        if not name:
+            continue
         team = rec.get("_team", info.get("team", "")) or ""
         pos = info["pos"] or ""
+        hs = info["hs"] if isinstance(info["hs"], str) else ""
         out_players[gid] = {
-            "id": gid, "name": info["name"], "pos": pos, "grp": grp(pos), "team": team,
-            "hs": info["hs"], "seasons": rec["seasons"],
+            "id": gid, "name": name, "pos": pos, "grp": grp(pos), "team": team,
+            "hs": hs, "seasons": rec["seasons"],
         }
-        index.append({"id": gid, "name": info["name"], "pos": pos, "team": team})
+        index.append({"id": gid, "name": name, "pos": pos, "team": team})
 
     index.sort(key=lambda x: x["name"])
     teams_idx = sorted({p["team"] for p in index if p["team"]})
@@ -200,10 +209,12 @@ def main():
     (PUB / "search_index.json").write_text(json.dumps(
         {"players": index, "teams": teams_idx, "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d")},
         separators=(",", ":")))
-    meta = {"updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "seasons": [str(s) for s in seasons]}
-    (PUB / "players.json").write_text(json.dumps({**meta, "players": out_players}, separators=(",", ":")))
-    (PUB / "targets.json").write_text(json.dumps({**meta, "data": targets}, separators=(",", ":")))
-    (PUB / "rushes.json").write_text(json.dumps({**meta, "data": rushes}, separators=(",", ":")))
+    upd = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    (PUB / "players.json").write_text(json.dumps(
+        {"updated": upd, "seasons": [str(s) for s in range(STAT_FIRST, cur + 1)], "players": out_players}, separators=(",", ":")))
+    map_meta = {"updated": upd, "seasons": [str(s) for s in range(MAP_FIRST, cur + 1)]}
+    (PUB / "targets.json").write_text(json.dumps({**map_meta, "data": targets}, separators=(",", ":")))
+    (PUB / "rushes.json").write_text(json.dumps({**map_meta, "data": rushes}, separators=(",", ":")))
 
     print(f"players {len(out_players)}, index {len(index)}, "
           f"players.json {(PUB/'players.json').stat().st_size/1e6:.2f}MB, "
