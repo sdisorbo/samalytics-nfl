@@ -40,19 +40,22 @@ export const GAP_LABEL: Record<string, string> = {
 // which stat columns a position group shows, in order: [key, label]
 export const STAT_COLUMNS: Record<string, [string, string][]> = {
   QB: [["g", "G"], ["cmp", "Cmp"], ["att", "Att"], ["py", "Pass Yds"], ["ptd", "TD"], ["intc", "Int"],
-       ["sk", "Sk"], ["pepa", "Pass EPA"], ["car", "Rush"], ["ry", "Rush Yds"], ["rtd", "Rush TD"], ["repa", "Rush EPA"]],
-  RB: [["g", "G"], ["car", "Att"], ["ry", "Rush Yds"], ["rtd", "TD"], ["repa", "Rush EPA"],
-       ["tgt", "Tgt"], ["rec", "Rec"], ["recy", "Rec Yds"], ["rectd", "Rec TD"], ["recepa", "Rec EPA"]],
+       ["sk", "Sk"], ["pepa", "EPA/att"], ["car", "Rush"], ["ry", "Rush Yds"], ["rtd", "Rush TD"], ["repa", "EPA/car"]],
+  RB: [["g", "G"], ["car", "Att"], ["ry", "Rush Yds"], ["rtd", "TD"], ["repa", "EPA/car"],
+       ["tgt", "Tgt"], ["rec", "Rec"], ["recy", "Rec Yds"], ["rectd", "Rec TD"], ["recepa", "EPA/tgt"]],
   WR: [["g", "G"], ["tgt", "Tgt"], ["rec", "Rec"], ["recy", "Rec Yds"], ["rectd", "TD"], ["ay", "Air Yds"],
-       ["yac", "YAC"], ["recepa", "Rec EPA"], ["car", "Rush"], ["ry", "Rush Yds"]],
+       ["yac", "YAC"], ["recepa", "EPA/tgt"], ["car", "Rush"], ["ry", "Rush Yds"]],
   TE: [["g", "G"], ["tgt", "Tgt"], ["rec", "Rec"], ["recy", "Rec Yds"], ["rectd", "TD"], ["ay", "Air Yds"],
-       ["yac", "YAC"], ["recepa", "Rec EPA"]],
+       ["yac", "YAC"], ["recepa", "EPA/tgt"]],
   K:  [["g", "G"], ["fgm", "FGM"], ["fga", "FGA"], ["fgl", "Long"], ["xpm", "XPM"], ["xpa", "XPA"]],
   DEF: [["g", "G"], ["tkl", "Tkl"], ["solo", "Solo"], ["sk", "Sacks"], ["tfl", "TFL"], ["qbh", "QB Hit"],
         ["intc", "Int"], ["pd", "PD"], ["ff", "FF"], ["dtd", "TD"]],
   OL: [["g", "G"], ["osnp", "Off Snaps"]],
   ST: [["g", "G"], ["stsnp", "ST Snaps"], ["osnp", "Off Snaps"], ["dsnp", "Def Snaps"]],
 };
+
+// EPA columns are stored as season totals; divide by these play counts to show EPA per play
+export const EPA_DENOM: Record<string, string> = { pepa: "att", repa: "car", recepa: "tgt" };
 
 export const HAS_RECEIVING_MAP = new Set(["WR", "TE", "RB"]);
 export const HAS_RUSHING_MAP = new Set(["RB"]);

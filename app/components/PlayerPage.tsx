@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  loadPlayers, loadTargets, loadPasses, loadRushes, STAT_COLUMNS,
+  loadPlayers, loadTargets, loadPasses, loadRushes, STAT_COLUMNS, EPA_DENOM,
   HAS_RECEIVING_MAP, HAS_RUSHING_MAP, HAS_PASSING_MAP,
   type PlayerRec, type Target, type RushGaps,
 } from "../lib/players";
@@ -11,6 +11,12 @@ import { logoUrl } from "../lib/teams";
 import { ReceivingMap, RushingMap } from "./FieldMap";
 
 const isEpa = (k: string) => k.endsWith("epa");
+// EPA per play from a season/career totals row (total EPA ÷ its play count)
+function epaPerPlay(row: Record<string, number>, k: string): number {
+  const d = row[EPA_DENOM[k]] ?? 0;
+  return d ? (row[k] ?? 0) / d : 0;
+}
+const fmtEpa = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}`;
 
 export default function PlayerPage() {
   const id = useSearchParams().get("id") ?? "";
@@ -77,7 +83,7 @@ export default function PlayerPage() {
       </div>
 
       {/* season stats */}
-      <div className="section-heading">Season stats · EPA</div>
+      <div className="section-heading">Season stats · EPA per play</div>
       <div className="stat-card !p-0 mb-7">
         <div className="table-scroll">
           <table className="data-table">
@@ -99,18 +105,26 @@ export default function PlayerPage() {
                         ? <span className="inline-flex items-center gap-1"><img src={logoUrl(tm)} alt={tm} width={16} height={16} className="object-contain" /><span className="text-2xs text-s-muted">{tm}</span></span>
                         : null; })()}
                     </td>
-                    {cols.map(([k]) => (
-                      <td key={k} style={isEpa(k) ? { color: (s[k] ?? 0) >= 0 ? "var(--heat-green)" : "var(--heat-purple)", fontWeight: 700 } : undefined}>
-                        {isEpa(k) && (s[k] ?? 0) > 0 ? "+" : ""}{s[k] ?? 0}
-                      </td>
-                    ))}
+                    {cols.map(([k]) => {
+                      if (isEpa(k)) {
+                        const v = epaPerPlay(s, k);
+                        return <td key={k} style={{ color: v >= 0 ? "var(--heat-green)" : "var(--heat-purple)", fontWeight: 700 }}>{fmtEpa(v)}</td>;
+                      }
+                      return <td key={k}>{s[k] ?? 0}</td>;
+                    })}
                   </tr>
                 );
               })}
               {years.length > 1 && (
                 <tr style={{ borderTop: "2px solid var(--color-border)" }}>
                   <td className="lft font-black stk stk0">Car</td><td />
-                  {cols.map(([k]) => <td key={k} className="font-bold">{k === "g" || !isEpa(k) ? (k === "fgl" ? "" : totals[k]) : ((totals[k] > 0 ? "+" : "") + Math.round(totals[k] * 10) / 10)}</td>)}
+                  {cols.map(([k]) => {
+                    if (isEpa(k)) {
+                      const v = epaPerPlay(totals, k);
+                      return <td key={k} className="font-bold" style={{ color: v >= 0 ? "var(--heat-green)" : "var(--heat-purple)" }}>{fmtEpa(v)}</td>;
+                    }
+                    return <td key={k} className="font-bold">{k === "fgl" ? "" : totals[k]}</td>;
+                  })}
                 </tr>
               )}
             </tbody>
