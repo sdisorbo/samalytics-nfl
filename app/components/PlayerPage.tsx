@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  loadPlayers, loadTargets, loadRushes, STAT_COLUMNS, HAS_RECEIVING_MAP, HAS_RUSHING_MAP,
+  loadPlayers, loadTargets, loadPasses, loadRushes, STAT_COLUMNS,
+  HAS_RECEIVING_MAP, HAS_RUSHING_MAP, HAS_PASSING_MAP,
   type PlayerRec, type Target, type RushGaps,
 } from "../lib/players";
 import { logoUrl } from "../lib/teams";
@@ -15,6 +16,7 @@ export default function PlayerPage() {
   const id = useSearchParams().get("id") ?? "";
   const [player, setPlayer] = useState<PlayerRec | null | undefined>(undefined);
   const [targets, setTargets] = useState<Record<string, Target[]> | null>(null);
+  const [passes, setPasses] = useState<Record<string, Target[]> | null>(null);
   const [rushes, setRushes] = useState<Record<string, RushGaps> | null>(null);
 
   useEffect(() => {
@@ -27,6 +29,7 @@ export default function PlayerPage() {
   useEffect(() => {
     if (!player) return;
     if (HAS_RECEIVING_MAP.has(grp)) loadTargets().then((f) => setTargets(f.data[id] ?? {}));
+    if (HAS_PASSING_MAP.has(grp)) loadPasses().then((f) => setPasses(f.data[id] ?? {}));
     if (HAS_RUSHING_MAP.has(grp)) loadRushes().then((f) => setRushes(f.data[id] ?? {}));
   }, [player, grp, id]);
 
@@ -40,12 +43,12 @@ export default function PlayerPage() {
 
   // map season selector
   const mapSeasons = useMemo(() => {
-    const t = targets ? Object.keys(targets) : [];
-    const r = rushes ? Object.keys(rushes) : [];
-    return Array.from(new Set([...t, ...r])).sort();
-  }, [targets, rushes]);
+    const keys = [targets, passes, rushes].flatMap((m) => (m ? Object.keys(m) : []));
+    return Array.from(new Set(keys)).sort();
+  }, [targets, passes, rushes]);
   const [mapYr, setMapYr] = useState<string>("");
-  const [mapMode, setMapMode] = useState<"rec" | "rush">("rec");
+  const [mapMode, setMapMode] = useState<"rec" | "rush" | "pass">("rec");
+  useEffect(() => { setMapMode(HAS_PASSING_MAP.has(grp) ? "pass" : "rec"); }, [grp]);
   useEffect(() => { if (mapSeasons.length && !mapSeasons.includes(mapYr)) setMapYr(mapSeasons[mapSeasons.length - 1]); }, [mapSeasons, mapYr]);
 
   if (player === undefined) return <p className="text-s-muted text-sm">Loading…</p>;
@@ -54,8 +57,9 @@ export default function PlayerPage() {
   );
 
   const showRec = HAS_RECEIVING_MAP.has(grp) && targets && targets[mapYr]?.length;
+  const showPass = HAS_PASSING_MAP.has(grp) && passes && passes[mapYr]?.length;
   const showRush = HAS_RUSHING_MAP.has(grp) && rushes && rushes[mapYr];
-  const hasMap = mapSeasons.length > 0 && (showRec || showRush);
+  const hasMap = mapSeasons.length > 0 && (showRec || showPass || showRush);
 
   return (
     <>
@@ -90,7 +94,11 @@ export default function PlayerPage() {
                 return (
                   <tr key={y}>
                     <td className="lft font-semibold stk stk0">{y}</td>
-                    <td className="lft"><img src={logoUrl(player.team)} alt="" width={16} height={16} className="object-contain inline" /></td>
+                    <td className="lft">
+                      {(() => { const tm = player.tms?.[y] ?? player.team; return tm
+                        ? <span className="inline-flex items-center gap-1"><img src={logoUrl(tm)} alt={tm} width={16} height={16} className="object-contain" /><span className="text-2xs text-s-muted">{tm}</span></span>
+                        : null; })()}
+                    </td>
                     {cols.map(([k]) => (
                       <td key={k} style={isEpa(k) ? { color: (s[k] ?? 0) >= 0 ? "var(--heat-green)" : "var(--heat-purple)", fontWeight: 700 } : undefined}>
                         {isEpa(k) && (s[k] ?? 0) > 0 ? "+" : ""}{s[k] ?? 0}
@@ -126,11 +134,13 @@ export default function PlayerPage() {
             )}
           </div>
           <div className="stat-card">
-            {mapMode === "rush" && showRush
-              ? <RushingMap gaps={rushes![mapYr]} />
-              : showRec
-                ? <ReceivingMap targets={targets![mapYr]} />
-                : <p className="text-s-muted text-sm">No {mapMode === "rush" ? "rushing" : "receiving"} data for {mapYr}.</p>}
+            {mapMode === "pass" && showPass
+              ? <ReceivingMap targets={passes![mapYr]} kind="pass" />
+              : mapMode === "rush" && showRush
+                ? <RushingMap gaps={rushes![mapYr]} />
+                : showRec
+                  ? <ReceivingMap targets={targets![mapYr]} />
+                  : <p className="text-s-muted text-sm">No {mapMode} data for {mapYr}.</p>}
           </div>
         </>
       )}

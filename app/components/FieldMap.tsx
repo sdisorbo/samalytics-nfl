@@ -3,7 +3,11 @@ import { useMemo, useState } from "react";
 import { GAP_ORDER, GAP_LABEL, type Target, type RushGaps } from "../lib/players";
 
 type RecMetric = "tgt" | "catch" | "epa" | "yds";
-const REC_METRICS: [RecMetric, string][] = [["tgt", "Target %"], ["catch", "Catch %"], ["epa", "EPA / tgt"], ["yds", "Yds / tgt"]];
+// wording differs for a receiver's targets vs a passer's attempts
+const WORDS = {
+  rec: { unit: "Target", comp: "Catch %", per: "tgt", dot: "caught", noun: "target" },
+  pass: { unit: "Attempt", comp: "Comp %", per: "att", dot: "complete", noun: "pass" },
+};
 const LOS_BLUE = "#2f6fed", FD_GOLD = "#ecc94b";
 
 function green(i: number) { return `color-mix(in srgb, var(--heat-green) ${Math.round(Math.max(0, Math.min(1, i)) * 78)}%, transparent)`; }
@@ -16,11 +20,13 @@ const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.lengt
 const LANE_NAME = ["Left", "Middle", "Right"];
 
 // ── receiving: real target dots at (side, air-yards depth) over a field ───────
-export function ReceivingMap({ targets }: { targets: Target[] }) {
+export function ReceivingMap({ targets, kind = "rec" }: { targets: Target[]; kind?: "rec" | "pass" }) {
   const [metric, setMetric] = useState<RecMetric>("tgt");
   const [hover, setHover] = useState<number | null>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const W = 340, H = 470, top = 18, bot = 408, padX = 6;
+  const w = WORDS[kind];
+  const REC_METRICS: [RecMetric, string][] = [["tgt", `${w.unit} %`], ["catch", w.comp], ["epa", `EPA / ${w.per}`], ["yds", `Yds / ${w.per}`]];
 
   const { dmin, dmax } = useMemo(() => {
     const ays = targets.map((t) => t[1]);
@@ -120,28 +126,28 @@ export function ReceivingMap({ targets }: { targets: Target[] }) {
               <div className="font-bold mb-0.5">{LANE_NAME[hz.lane]} · {hz.b0 < 0 ? "behind LOS" : `${hz.b0}–${hz.b1 === 100 ? "30+" : hz.b1} yds`}</div>
               {hz.vals.length ? (
                 <div className="grid grid-cols-2 gap-x-2 text-s-muted">
-                  <span>Targets</span><span className="text-right text-s-text font-semibold">{hz.vals.length} ({Math.round(hz.vals.length / N * 100)}%)</span>
-                  <span>Catch %</span><span className="text-right text-s-text font-semibold">{Math.round(mean(hz.vals.map((v) => v[2])) * 100)}%</span>
-                  <span>Yds / tgt</span><span className="text-right text-s-text font-semibold">{mean(hz.vals.map((v) => v[4])).toFixed(1)}</span>
-                  <span>EPA / tgt</span><span className="text-right font-semibold" style={{ color: mean(hz.vals.map((v) => v[3])) >= 0 ? "var(--heat-green)" : "var(--heat-purple)" }}>{mean(hz.vals.map((v) => v[3])).toFixed(2)}</span>
+                  <span>{w.unit}s</span><span className="text-right text-s-text font-semibold">{hz.vals.length} ({Math.round(hz.vals.length / N * 100)}%)</span>
+                  <span>{w.comp}</span><span className="text-right text-s-text font-semibold">{Math.round(mean(hz.vals.map((v) => v[2])) * 100)}%</span>
+                  <span>Yds / {w.per}</span><span className="text-right text-s-text font-semibold">{mean(hz.vals.map((v) => v[4])).toFixed(1)}</span>
+                  <span>EPA / {w.per}</span><span className="text-right font-semibold" style={{ color: mean(hz.vals.map((v) => v[3])) >= 0 ? "var(--heat-green)" : "var(--heat-purple)" }}>{mean(hz.vals.map((v) => v[3])).toFixed(2)}</span>
                 </div>
-              ) : <div className="text-s-muted">No targets here</div>}
+              ) : <div className="text-s-muted">No {w.noun}s here</div>}
             </div>
           )}
         </div>
 
         <div className="text-sm">
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 max-w-xs">
-            <Stat label="Targets" value={sum.n} />
-            <Stat label="Catch %" value={`${(sum.catch * 100).toFixed(0)}%`} />
+            <Stat label={`${w.unit}s`} value={sum.n} />
+            <Stat label={w.comp} value={`${(sum.catch * 100).toFixed(0)}%`} />
             <Stat label="aDOT" value={sum.adot.toFixed(1)} />
-            <Stat label="Yds / tgt" value={sum.yds.toFixed(1)} />
-            <Stat label="EPA / tgt" value={sum.epa.toFixed(2)} color={sum.epa >= 0 ? "var(--heat-green)" : "var(--heat-purple)"} />
+            <Stat label={`Yds / ${w.per}`} value={sum.yds.toFixed(1)} />
+            <Stat label={`EPA / ${w.per}`} value={sum.epa.toFixed(2)} color={sum.epa >= 0 ? "var(--heat-green)" : "var(--heat-purple)"} />
           </div>
           <p className="text-2xs text-s-muted mt-3 leading-relaxed max-w-xs">
-            <span className="inline-block w-2 h-2 rounded-full align-middle mr-1" style={{ background: "var(--heat-green)" }} />caught ·
+            <span className="inline-block w-2 h-2 rounded-full align-middle mr-1" style={{ background: "var(--heat-green)" }} />{w.dot} ·
             <span className="inline-block w-2 h-2 rounded-full align-middle mx-1" style={{ background: "var(--color-muted)" }} />incomplete.
-            Every dot is a <strong className="text-s-text">real target</strong>: its depth (air yards) and side
+            Every dot is a <strong className="text-s-text">real {w.noun}</strong>: its depth (air yards) and side
             (L/M/R) are exact — only the spread within a lane is cosmetic, since the data has no finer left-right
             coordinate. Hover any zone for its averages.
           </p>

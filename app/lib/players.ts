@@ -9,6 +9,7 @@ export type SeasonStat = Record<string, number>;
 export type PlayerRec = {
   id: string; name: string; pos: string; grp: string; team: string; hs: string;
   seasons: Record<string, SeasonStat>;
+  tms: Record<string, string>;   // year -> team that season (players change teams)
 };
 export type PlayersFile = { updated: string; seasons: string[]; players: Record<string, PlayerRec> };
 
@@ -27,6 +28,7 @@ function cached<T>(url: string): () => Promise<T> {
 export const loadIndex = cached<SearchIndex>("/search_index.json");
 export const loadPlayers = cached<PlayersFile>("/players.json");
 export const loadTargets = cached<TargetsFile>("/targets.json");
+export const loadPasses = cached<TargetsFile>("/passes.json");
 export const loadRushes = cached<RushesFile>("/rushes.json");
 
 export const GAP_ORDER = ["LE", "LT", "LG", "M", "RG", "RT", "RE"] as const;
@@ -54,3 +56,4 @@ export const STAT_COLUMNS: Record<string, [string, string][]> = {
 
 export const HAS_RECEIVING_MAP = new Set(["WR", "TE", "RB"]);
 export const HAS_RUSHING_MAP = new Set(["RB"]);
+export const HAS_PASSING_MAP = new Set(["QB"]);

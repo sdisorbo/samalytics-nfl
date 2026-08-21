@@ -102,7 +102,8 @@ def main():
             pfr2gsis[r["pfr_id"]] = gid
 
     players = defaultdict(lambda: {"seasons": {}})   # gid -> {seasons: {yr: {...}}}
-    targets = defaultdict(dict)                       # gid -> {yr: [[lane,ay,catch,epa,yds],...]}
+    targets = defaultdict(dict)                       # gid -> {yr: [[lane,ay,catch,epa,yds],...]}  (receiver)
+    passes = defaultdict(dict)                        # gid -> {yr: [[lane,ay,complete,epa,yds],...]}  (passer)
     rushes = defaultdict(dict)                        # gid -> {yr: {gap: [att,yds,epaSum,stuffed]}}
 
     # ── full-career season stats (player_stats back to 1999) ─────────────────
@@ -120,7 +121,9 @@ def main():
             row = season_stat_row(grp(gpos), rows)
             row = {k: v for k, v in row.items() if v or k == "g"}   # drop zeros to stay lean
             players[gid]["seasons"][str(season)] = row
-            players[gid]["_team"] = rows["team"].mode().iloc[0] if len(rows["team"].mode()) else ident[gid]["team"]
+            team = rows["team"].mode().iloc[0] if len(rows["team"].mode()) else ident[gid]["team"]
+            players[gid]["_team"] = team
+            players[gid].setdefault("tmYr", {})[str(season)] = team
             hs = rows["headshot_url"].dropna()
             if not ident[gid]["hs"] and len(hs):
                 ident[gid]["hs"] = hs.iloc[-1]
@@ -142,6 +145,7 @@ def main():
             if yr not in players[gid]["seasons"]:
                 players[gid]["seasons"][yr] = {"g": 0}
                 players[gid]["_team"] = r["team"]
+                players[gid].setdefault("tmYr", {}).setdefault(yr, r["team"])
             for k, v in (("osnp", r0(r["o"])), ("dsnp", r0(r["d"])), ("stsnp", r0(r["st"]))):
                 if v:
                     players[gid]["seasons"][yr][k] = v
@@ -154,16 +158,22 @@ def main():
     for season in range(MAP_FIRST, cur + 1):
         pbp = nfl.load_pbp(seasons=[season]).to_pandas()
         yr = str(season)
-        pas = pbp[(pbp["play_type"] == "pass") & pbp["receiver_player_id"].notna()
-                  & pbp["air_yards"].notna() & pbp["pass_location"].isin(["left", "middle", "right"])]
-        by_rec = defaultdict(list)
+        pas = pbp[(pbp["play_type"] == "pass") & pbp["air_yards"].notna()
+                  & pbp["pass_location"].isin(["left", "middle", "right"])]
+        by_rec, by_pass = defaultdict(list), defaultdict(list)
         for _, p in pas.iterrows():
-            by_rec[p["receiver_player_id"]].append(
-                [lane[p["pass_location"]], r0(p["air_yards"]), int(p["complete_pass"] == 1), r1(p["epa"]),
-                 r0(p["yards_gained"])])
+            row = [lane[p["pass_location"]], r0(p["air_yards"]), int(p["complete_pass"] == 1), r1(p["epa"]),
+                   r0(p["yards_gained"])]
+            if isinstance(p["receiver_player_id"], str):
+                by_rec[p["receiver_player_id"]].append(row)
+            if isinstance(p["passer_player_id"], str):
+                by_pass[p["passer_player_id"]].append(row)
         for gid, arr in by_rec.items():
-            if isinstance(gid, str) and len(arr) >= 10:
+            if len(arr) >= 10:
                 targets[gid][yr] = arr
+        for gid, arr in by_pass.items():
+            if len(arr) >= 30:
+                passes[gid][yr] = arr
 
         run = pbp[(pbp["play_type"] == "run") & pbp["rusher_player_id"].notna()]
         by_rush = defaultdict(lambda: defaultdict(lambda: [0, 0, 0.0, 0]))
@@ -198,7 +208,7 @@ def main():
         hs = info["hs"] if isinstance(info["hs"], str) else ""
         out_players[gid] = {
             "id": gid, "name": name, "pos": pos, "grp": grp(pos), "team": team,
-            "hs": hs, "seasons": rec["seasons"],
+            "hs": hs, "seasons": rec["seasons"], "tms": rec.get("tmYr", {}),
         }
         index.append({"id": gid, "name": name, "pos": pos, "team": team})
 
@@ -214,6 +224,7 @@ def main():
         {"updated": upd, "seasons": [str(s) for s in range(STAT_FIRST, cur + 1)], "players": out_players}, separators=(",", ":")))
     map_meta = {"updated": upd, "seasons": [str(s) for s in range(MAP_FIRST, cur + 1)]}
     (PUB / "targets.json").write_text(json.dumps({**map_meta, "data": targets}, separators=(",", ":")))
+    (PUB / "passes.json").write_text(json.dumps({**map_meta, "data": passes}, separators=(",", ":")))
     (PUB / "rushes.json").write_text(json.dumps({**map_meta, "data": rushes}, separators=(",", ":")))
 
     print(f"players {len(out_players)}, index {len(index)}, "
