@@ -25,11 +25,21 @@ function cached<T>(url: string): () => Promise<T> {
   return () => (p ??= fetch(url).then((r) => r.json() as Promise<T>));
 }
 
+// league baselines / team defense (for league-relative coloring + team D maps)
+export type ZoneLeague = { z: number[][]; N: number };   // z: 21 zones of [n, compSum, epaSum, ydsSum]
+export type GapLeague = { g: Record<string, number[]>; N: number };
+export type FieldLeagueFile = { seasons: string[]; pass: Record<string, ZoneLeague>; rush: Record<string, GapLeague> };
+export type TeamDefZonesFile = { seasons: string[]; data: Record<string, Record<string, ZoneLeague>> };
+export type TeamDefGapsFile = { seasons: string[]; data: Record<string, Record<string, GapLeague>> };
+
 export const loadIndex = cached<SearchIndex>("/search_index.json");
 export const loadPlayers = cached<PlayersFile>("/players.json");
 export const loadTargets = cached<TargetsFile>("/targets.json");
 export const loadPasses = cached<TargetsFile>("/passes.json");
 export const loadRushes = cached<RushesFile>("/rushes.json");
+export const loadFieldLeague = cached<FieldLeagueFile>("/field_league.json");
+export const loadTeamPassDef = cached<TeamDefZonesFile>("/team_passdef.json");
+export const loadTeamRushDef = cached<TeamDefGapsFile>("/team_rushdef.json");
 
 export const GAP_ORDER = ["LE", "LT", "LG", "M", "RG", "RT", "RE"] as const;
 export const GAP_LABEL: Record<string, string> = {

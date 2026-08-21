@@ -4,7 +4,11 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ELO, SEASONS, DEFAULT_SEASON } from "../lib/data";
 import { logoUrl, TEAMS } from "../lib/teams";
-import { loadPlayers, type PlayerRec } from "../lib/players";
+import {
+  loadPlayers, loadFieldLeague, loadTeamPassDef, loadTeamRushDef,
+  type PlayerRec, type FieldLeagueFile, type ZoneLeague, type GapLeague,
+} from "../lib/players";
+import { ReceivingMap, RushingMap } from "./FieldMap";
 
 function pct(x: number) { return x >= 0.9995 ? "100%" : x < 0.01 ? (x > 0 ? "<1%" : "—") : `${(x * 100).toFixed(0)}%`; }
 
@@ -12,7 +16,19 @@ export default function TeamPage() {
   const abbr = useSearchParams().get("abbr") ?? "";
   const name = TEAMS[abbr]?.name ?? abbr;
   const [players, setPlayers] = useState<Record<string, PlayerRec> | null>(null);
-  useEffect(() => { loadPlayers().then((f) => setPlayers(f.players)); }, []);
+  const [passDef, setPassDef] = useState<Record<string, ZoneLeague> | null>(null);
+  const [rushDef, setRushDef] = useState<Record<string, GapLeague> | null>(null);
+  const [league, setLeague] = useState<FieldLeagueFile | null>(null);
+  useEffect(() => {
+    loadPlayers().then((f) => setPlayers(f.players));
+    loadTeamPassDef().then((f) => setPassDef(f.data[abbr] ?? {}));
+    loadTeamRushDef().then((f) => setRushDef(f.data[abbr] ?? {}));
+    loadFieldLeague().then(setLeague);
+  }, [abbr]);
+  const defSeasons = useMemo(() => (passDef ? Object.keys(passDef).sort() : []), [passDef]);
+  const [defYr, setDefYr] = useState("");
+  useEffect(() => { if (defSeasons.length && !defSeasons.includes(defYr)) setDefYr(defSeasons[defSeasons.length - 1]); }, [defSeasons, defYr]);
+  const [defMode, setDefMode] = useState<"pass" | "rush">("pass");
 
   const rows = useMemo(() => SEASONS.map((s) => {
     const t = ELO[s]?.teams.find((x) => x.abbr === abbr);
@@ -88,6 +104,34 @@ export default function TeamPage() {
               </div>
             ) : null,
           )}
+        </div>
+      )}
+
+      {/* defensive field maps */}
+      {defSeasons.length > 0 && (
+        <div className="mt-7">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <h2 className="section-heading !mb-0">Defense</h2>
+            <select className="ctl !py-1" value={defYr} onChange={(e) => setDefYr(e.target.value)}>
+              {defSeasons.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <div className="segment">
+              <button className={defMode === "pass" ? "on" : ""} onClick={() => setDefMode("pass")}>Pass D</button>
+              <button className={defMode === "rush" ? "on" : ""} onClick={() => setDefMode("rush")}>Rush D</button>
+            </div>
+          </div>
+          <div className="stat-card">
+            {!league ? <p className="text-s-muted text-sm">Loading…</p>
+              : defMode === "pass" && passDef?.[defYr]
+                ? <ReceivingMap zones={passDef[defYr].z} total={passDef[defYr].N} league={league.pass[defYr]} kind="pass" defense />
+                : defMode === "rush" && rushDef?.[defYr]
+                  ? <RushingMap gaps={rushDef[defYr].g} league={league.rush[defYr]} defense />
+                  : <p className="text-s-muted text-sm">No {defMode === "pass" ? "pass" : "rush"} defense data for {defYr}.</p>}
+          </div>
+          <p className="text-2xs text-s-muted mt-2">
+            How this defense fared by field zone vs the rest of the league — pass D shows opponents&apos; throws
+            (like a QB map), rush D shows runs faced by gap (like an RB map). Green = better than an average defense.
+          </p>
         </div>
       )}
     </>

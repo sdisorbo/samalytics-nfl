@@ -151,48 +151,75 @@ def main():
                     players[gid]["seasons"][yr][k] = v
     nfl.clear_cache()
 
-    # ── receiving/rushing field maps (pbp, 2021+; cache cleared each season) ──
+    # ── receiving/rushing field maps + league baselines + team defense ───────
     lane = {"left": 0, "middle": 1, "right": 2}
     gapmap = {("left", "end"): "LE", ("left", "tackle"): "LT", ("left", "guard"): "LG",
               ("right", "end"): "RE", ("right", "tackle"): "RT", ("right", "guard"): "RG"}
+    BINS = [-100, 0, 5, 10, 15, 20, 30, 100]
+
+    def zbin(ay):
+        for i in range(7):
+            if BINS[i] <= ay < BINS[i + 1]:
+                return i
+        return 6
+
+    league = {"pass": {}, "rush": {}}          # per-season baselines
+    team_passdef = defaultdict(dict)           # team -> {yr: {z, N}}
+    team_rushdef = defaultdict(dict)           # team -> {yr: {g, N}}
+
     for season in range(MAP_FIRST, cur + 1):
         pbp = nfl.load_pbp(seasons=[season]).to_pandas()
         yr = str(season)
         pas = pbp[(pbp["play_type"] == "pass") & pbp["air_yards"].notna()
                   & pbp["pass_location"].isin(["left", "middle", "right"])]
         by_rec, by_pass = defaultdict(list), defaultdict(list)
+        lgz = [[0, 0, 0.0, 0] for _ in range(21)]; lgn = 0     # league pass zones
+        tdz = defaultdict(lambda: [[0, 0, 0.0, 0] for _ in range(21)]); tdn = defaultdict(int)
         for _, p in pas.iterrows():
-            row = [lane[p["pass_location"]], r0(p["air_yards"]), int(p["complete_pass"] == 1), r1(p["epa"]),
-                   r0(p["yards_gained"])]
+            comp = int(p["complete_pass"] == 1); ep = 0.0 if pd.isna(p["epa"]) else float(p["epa"]); yg = r0(p["yards_gained"])
+            row = [lane[p["pass_location"]], r0(p["air_yards"]), comp, round(ep, 1), yg]
             if isinstance(p["receiver_player_id"], str):
                 by_rec[p["receiver_player_id"]].append(row)
             if isinstance(p["passer_player_id"], str):
                 by_pass[p["passer_player_id"]].append(row)
+            z = lane[p["pass_location"]] * 7 + zbin(r0(p["air_yards"]))
+            a = lgz[z]; a[0] += 1; a[1] += comp; a[2] += ep; a[3] += yg; lgn += 1
+            dt = p["defteam"]
+            if isinstance(dt, str):
+                b = tdz[dt][z]; b[0] += 1; b[1] += comp; b[2] += ep; b[3] += yg; tdn[dt] += 1
         for gid, arr in by_rec.items():
             if len(arr) >= 10:
                 targets[gid][yr] = arr
         for gid, arr in by_pass.items():
             if len(arr) >= 30:
                 passes[gid][yr] = arr
+        league["pass"][yr] = {"z": [[a[0], a[1], round(a[2], 1), a[3]] for a in lgz], "N": lgn}
+        for tm, z in tdz.items():
+            team_passdef[tm][yr] = {"z": [[a[0], a[1], round(a[2], 1), a[3]] for a in z], "N": tdn[tm]}
 
         run = pbp[(pbp["play_type"] == "run") & pbp["rusher_player_id"].notna()]
         by_rush = defaultdict(lambda: defaultdict(lambda: [0, 0, 0.0, 0]))
+        lgg = defaultdict(lambda: [0, 0, 0.0, 0]); lgan = 0    # league rush gaps
+        tdg = defaultdict(lambda: defaultdict(lambda: [0, 0, 0.0, 0])); tdan = defaultdict(int)
         for _, p in run.iterrows():
             loc, gp = p["run_location"], p["run_gap"]
-            if loc == "middle" or not isinstance(loc, str):
-                key = "M"
-            else:
-                key = gapmap.get((loc, gp if isinstance(gp, str) else "tackle"), f"{loc[0].upper()}T")
-            yg = r0(p["yards_gained"])
-            b = by_rush[p["rusher_player_id"]][key]
-            b[0] += 1; b[1] += yg; b[2] += (0.0 if pd.isna(p["epa"]) else float(p["epa"])); b[3] += int(yg <= 0)
+            key = "M" if (loc == "middle" or not isinstance(loc, str)) else gapmap.get((loc, gp if isinstance(gp, str) else "tackle"), f"{loc[0].upper()}T")
+            yg = r0(p["yards_gained"]); ep = 0.0 if pd.isna(p["epa"]) else float(p["epa"]); st = int(yg <= 0)
+            b = by_rush[p["rusher_player_id"]][key]; b[0] += 1; b[1] += yg; b[2] += ep; b[3] += st
+            lg = lgg[key]; lg[0] += 1; lg[1] += yg; lg[2] += ep; lg[3] += st; lgan += 1
+            dt = p["defteam"]
+            if isinstance(dt, str):
+                tg = tdg[dt][key]; tg[0] += 1; tg[1] += yg; tg[2] += ep; tg[3] += st; tdan[dt] += 1
         for gid, gaps in by_rush.items():
             if isinstance(gid, str) and sum(v[0] for v in gaps.values()) >= 20:
                 rushes[gid][yr] = {k: [v[0], v[1], round(v[2], 1), v[3]] for k, v in gaps.items()}
+        league["rush"][yr] = {"g": {k: [v[0], v[1], round(v[2], 1), v[3]] for k, v in lgg.items()}, "N": lgan}
+        for tm, g in tdg.items():
+            team_rushdef[tm][yr] = {"g": {k: [v[0], v[1], round(v[2], 1), v[3]] for k, v in g.items()}, "N": tdan[tm]}
 
         nfl.clear_cache()
         print(f"  {season}: {sum(1 for g in targets if yr in targets[g])} receivers, "
-              f"{sum(1 for g in rushes if yr in rushes[g])} rushers")
+              f"{sum(1 for g in rushes if yr in rushes[g])} rushers, {len(tdz)} team defenses")
 
     # assemble outputs
     out_players, index = {}, []
@@ -226,6 +253,9 @@ def main():
     (PUB / "targets.json").write_text(json.dumps({**map_meta, "data": targets}, separators=(",", ":")))
     (PUB / "passes.json").write_text(json.dumps({**map_meta, "data": passes}, separators=(",", ":")))
     (PUB / "rushes.json").write_text(json.dumps({**map_meta, "data": rushes}, separators=(",", ":")))
+    (PUB / "field_league.json").write_text(json.dumps({**map_meta, **league}, separators=(",", ":")))
+    (PUB / "team_passdef.json").write_text(json.dumps({**map_meta, "data": team_passdef}, separators=(",", ":")))
+    (PUB / "team_rushdef.json").write_text(json.dumps({**map_meta, "data": team_rushdef}, separators=(",", ":")))
 
     print(f"players {len(out_players)}, index {len(index)}, "
           f"players.json {(PUB/'players.json').stat().st_size/1e6:.2f}MB, "

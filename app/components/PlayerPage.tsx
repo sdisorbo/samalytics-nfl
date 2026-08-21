@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  loadPlayers, loadTargets, loadPasses, loadRushes, STAT_COLUMNS, EPA_DENOM,
+  loadPlayers, loadTargets, loadPasses, loadRushes, loadFieldLeague, STAT_COLUMNS, EPA_DENOM,
   HAS_RECEIVING_MAP, HAS_RUSHING_MAP, HAS_PASSING_MAP,
-  type PlayerRec, type Target, type RushGaps,
+  type PlayerRec, type Target, type RushGaps, type FieldLeagueFile,
 } from "../lib/players";
 import { logoUrl } from "../lib/teams";
 import { ReceivingMap, RushingMap } from "./FieldMap";
@@ -24,6 +24,7 @@ export default function PlayerPage() {
   const [targets, setTargets] = useState<Record<string, Target[]> | null>(null);
   const [passes, setPasses] = useState<Record<string, Target[]> | null>(null);
   const [rushes, setRushes] = useState<Record<string, RushGaps> | null>(null);
+  const [league, setLeague] = useState<FieldLeagueFile | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -37,6 +38,7 @@ export default function PlayerPage() {
     if (HAS_RECEIVING_MAP.has(grp)) loadTargets().then((f) => setTargets(f.data[id] ?? {}));
     if (HAS_PASSING_MAP.has(grp)) loadPasses().then((f) => setPasses(f.data[id] ?? {}));
     if (HAS_RUSHING_MAP.has(grp)) loadRushes().then((f) => setRushes(f.data[id] ?? {}));
+    if (HAS_RECEIVING_MAP.has(grp) || HAS_PASSING_MAP.has(grp) || HAS_RUSHING_MAP.has(grp)) loadFieldLeague().then(setLeague);
   }, [player, grp, id]);
 
   const cols = STAT_COLUMNS[grp] ?? STAT_COLUMNS.ST;
@@ -148,12 +150,13 @@ export default function PlayerPage() {
             )}
           </div>
           <div className="stat-card">
-            {mapMode === "pass" && showPass
-              ? <ReceivingMap targets={passes![mapYr]} kind="pass" />
+            {!league ? <p className="text-s-muted text-sm">Loading…</p>
+              : mapMode === "pass" && showPass
+              ? <ReceivingMap targets={passes![mapYr]} kind="pass" league={league.pass[mapYr]} />
               : mapMode === "rush" && showRush
-                ? <RushingMap gaps={rushes![mapYr]} />
+                ? <RushingMap gaps={rushes![mapYr]} league={league.rush[mapYr]} />
                 : showRec
-                  ? <ReceivingMap targets={targets![mapYr]} />
+                  ? <ReceivingMap targets={targets![mapYr]} league={league.pass[mapYr]} />
                   : <p className="text-s-muted text-sm">No {mapMode} data for {mapYr}.</p>}
           </div>
         </>
