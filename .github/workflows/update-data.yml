@@ -63,16 +63,17 @@ jobs:
           python scripts/build_data.py
           python scripts/build_fantasy.py
           python scripts/build_games.py
+          python scripts/build_players.py
 
       - name: Commit & push if changed
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- data; then
+          if git diff --quiet -- data public/*.json; then
             echo "No data changes."
           else
-            git add data
+            git add data public/*.json
             git commit -m "Auto-update NFL data ($(TZ=America/New_York date '+%Y-%m-%d %H:%M ET'))"
             git push
           fi

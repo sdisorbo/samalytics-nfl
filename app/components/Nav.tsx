@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
+import Search from "./Search";
 
 const LINKS = [
   { href: "/", label: "Standings" },
@@ -70,13 +71,16 @@ export default function Nav() {
           ))}
         </nav>
 
-        {/* mobile hamburger */}
-        <button className="sm:hidden ml-auto w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-lg hover:bg-s-hover"
-          onClick={() => setOpen((v) => !v)} aria-label={open ? "Close menu" : "Open menu"}>
-          <span className={clsx("block h-0.5 w-5 bg-s-text transition-all", open && "translate-y-2 rotate-45")} />
-          <span className={clsx("block h-0.5 w-5 bg-s-text transition-all", open && "opacity-0")} />
-          <span className={clsx("block h-0.5 w-5 bg-s-text transition-all", open && "-translate-y-2 -rotate-45")} />
-        </button>
+        {/* right side: search (all sizes) + mobile hamburger */}
+        <div className="flex items-center gap-1 ml-auto sm:ml-0">
+          <Search />
+          <button className="sm:hidden w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-lg hover:bg-s-hover"
+            onClick={() => setOpen((v) => !v)} aria-label={open ? "Close menu" : "Open menu"}>
+            <span className={clsx("block h-0.5 w-5 bg-s-text transition-all", open && "translate-y-2 rotate-45")} />
+            <span className={clsx("block h-0.5 w-5 bg-s-text transition-all", open && "opacity-0")} />
+            <span className={clsx("block h-0.5 w-5 bg-s-text transition-all", open && "-translate-y-2 -rotate-45")} />
+          </button>
+        </div>
       </div>
 
       {/* mobile dropdown */}
