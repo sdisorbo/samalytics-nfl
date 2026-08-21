@@ -152,11 +152,11 @@ export default function PlayerPage() {
           <div className="stat-card">
             {!league ? <p className="text-s-muted text-sm">Loading…</p>
               : mapMode === "pass" && showPass
-              ? <ReceivingMap targets={passes![mapYr]} kind="pass" league={league.pass[mapYr]} />
+              ? <ReceivingMap targets={passes![mapYr]} kind="pass" league={league.pass[mapYr]} meta={{ name: player.name, pos: player.pos, team: player.tms?.[mapYr] ?? player.team, hs: player.hs, season: mapYr, label: "Passing" }} />
               : mapMode === "rush" && showRush
-                ? <RushingMap gaps={rushes![mapYr]} league={league.rush[mapYr]} />
+                ? <RushingMap gaps={rushes![mapYr]} league={league.rush[mapYr]} meta={{ name: player.name, pos: player.pos, team: player.tms?.[mapYr] ?? player.team, hs: player.hs, season: mapYr, label: "Rushing" }} />
                 : showRec
-                  ? <ReceivingMap targets={targets![mapYr]} league={league.pass[mapYr]} />
+                  ? <ReceivingMap targets={targets![mapYr]} league={league.pass[mapYr]} meta={{ name: player.name, pos: player.pos, team: player.tms?.[mapYr] ?? player.team, hs: player.hs, season: mapYr, label: "Receiving" }} />
                   : <p className="text-s-muted text-sm">No {mapMode} data for {mapYr}.</p>}
           </div>
         </>

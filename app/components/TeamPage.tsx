@@ -123,9 +123,9 @@ export default function TeamPage() {
           <div className="stat-card">
             {!league ? <p className="text-s-muted text-sm">Loading…</p>
               : defMode === "pass" && passDef?.[defYr]
-                ? <ReceivingMap zones={passDef[defYr].z} total={passDef[defYr].N} league={league.pass[defYr]} kind="pass" defense />
+                ? <ReceivingMap zones={passDef[defYr].z} total={passDef[defYr].N} league={league.pass[defYr]} kind="pass" defense meta={{ name, pos: "Defense", team: abbr, hs: "", season: defYr, label: "Pass Defense" }} />
                 : defMode === "rush" && rushDef?.[defYr]
-                  ? <RushingMap gaps={rushDef[defYr].g} league={league.rush[defYr]} defense />
+                  ? <RushingMap gaps={rushDef[defYr].g} league={league.rush[defYr]} defense meta={{ name, pos: "Defense", team: abbr, hs: "", season: defYr, label: "Rush Defense" }} />
                   : <p className="text-s-muted text-sm">No {defMode === "pass" ? "pass" : "rush"} defense data for {defYr}.</p>}
           </div>
           <p className="text-2xs text-s-muted mt-2">
