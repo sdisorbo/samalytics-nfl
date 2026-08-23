@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   computeWar, FANTASY_SEASONS, FANTASY_DEFAULT_SEASON, FANTASY_UPDATED,
-  DEFAULT_SETTINGS, POSITIONS,
-  type Settings, type Scoring, type Roster, type FantasyRow, type Pos,
+  DEFAULT_SETTINGS, POSITIONS, PROJECTIONS, PROJ_SEASON,
+  type Settings, type Scoring, type Roster, type FantasyRow, type Pos, type ProjPlayer,
 } from "../lib/fantasy";
 import { logoUrl } from "../lib/teams";
 
@@ -144,6 +144,8 @@ export default function FantasyView() {
   const [sortKey, setSortKey] = useState<SortKey>("war");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<FantasyRow | null>(null);
+  const [projKey, setProjKey] = useState<"proj" | "prev">("proj");
+  const isProj = season === PROJ_SEASON;
 
   const setScoring = (patch: Partial<Scoring>) =>
     setSettings((s) => ({ ...s, scoring: { ...s.scoring, ...patch } }));
@@ -194,9 +196,24 @@ export default function FantasyView() {
     });
   }, [all, posFilter, team, minG, q, sortKey, sortDir]);
 
+  // 2026 projections (standard scoring), filtered like the main table
+  const projRows = useMemo(() => {
+    let rs: ProjPlayer[] = PROJECTIONS.players;
+    if (posFilter.size) rs = rs.filter((r) => posFilter.has(r.pos as Pos));
+    if (team) rs = rs.filter((r) => r.team === team);
+    const query = q.trim().toLowerCase();
+    if (query) rs = rs.filter((r) => r.name.toLowerCase().includes(query) || r.team.toLowerCase().includes(query));
+    const dir = sortDir === "desc" ? -1 : 1;
+    return rs.slice().sort((a, b) => dir * (a[projKey] - b[projKey]));
+  }, [posFilter, team, q, projKey, sortDir]);
+
   function clickSort(k: SortKey) {
     if (k === sortKey) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     else { setSortKey(k); setSortDir(NUMERIC.has(k) ? "desc" : "asc"); }
+  }
+  function clickProj(k: "proj" | "prev") {
+    if (k === projKey) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    else { setProjKey(k); setSortDir("desc"); }
   }
   function togglePos(p: Pos) {
     setPosFilter((s) => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n; });
@@ -215,6 +232,7 @@ export default function FantasyView() {
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <select className="ctl" value={season} onChange={(e) => setSeason(e.target.value)}>
           {FANTASY_SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          <option value={PROJ_SEASON}>{PROJ_SEASON} (proj)</option>
         </select>
         <div className="flex flex-wrap gap-1">
           {POSITIONS.map((p) => (
@@ -339,6 +357,23 @@ export default function FantasyView() {
               subtracts value. That&apos;s why WAR, not raw points, separates a steady every-week starter
               from a boom-or-bust player with the same total.
             </p>
+            <p>
+              <strong className="text-s-text">Does WAR carry year to year?</strong> Moderately. Across
+              {" "}{PROJECTIONS.stability.n.toLocaleString()} player-seasons the correlation between one
+              year&apos;s WAR and the next is <strong className="text-s-text">r = {PROJECTIONS.stability.r.toFixed(2)}</strong>{" "}
+              (r² = {(PROJECTIONS.stability.r ** 2).toFixed(2)}) — a player keeps about
+              {" "}{Math.round(PROJECTIONS.stability.slope * 100)}% of their edge. It&apos;s stickiest at
+              WR ({PROJECTIONS.stability.byPos.WR?.toFixed(2)}) and TE ({PROJECTIONS.stability.byPos.TE?.toFixed(2)}),
+              lower at RB ({PROJECTIONS.stability.byPos.RB?.toFixed(2)}) and QB ({PROJECTIONS.stability.byPos.QB?.toFixed(2)}),
+              and essentially random for K ({PROJECTIONS.stability.byPos.K?.toFixed(2)}) and D/ST ({PROJECTIONS.stability.byPos.DST?.toFixed(2)}).
+            </p>
+            <p>
+              <strong className="text-s-text">The {PROJ_SEASON} (proj) season</strong> applies a regression
+              model ({PROJECTIONS.model.name}, R² = {PROJECTIONS.model.r2.toFixed(2)} on a held-out
+              {" "}{PROJECTIONS.fromSeason} test) to each player&apos;s recent WAR, volume, and age — it beat
+              both a naive &quot;same as last year&quot; carry and XGBoost. Projections use standard scoring,
+              so they don&apos;t shift with the settings above.
+            </p>
           </div>
         )}
       </div>
@@ -360,62 +395,116 @@ export default function FantasyView() {
       </div>
 
       {/* table */}
-      <div className="stat-card !p-0">
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th className="lft stk stk0">#</th>
-                {th("name", "Player", "lft stk stk1")}
-                {th("pos", "Pos", "lft")}
-                {th("team", "Tm", "lft")}
-                {th("g", "G")}
-                {th("pts", "Pts")}
-                {th("ppg", "PPG")}
-                {th("vorp", "VORP")}
-                {th("war", "WAR")}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={r.id} onClick={() => setSelected(r)} style={{ cursor: "pointer" }}>
-                  <td className="lft text-s-muted stk stk0">{i + 1}</td>
-                  <td className="lft stk stk1">
-                    <span className="inline-flex items-center gap-2.5 font-semibold">
-                      <img
-                        src={r.pos === "DST" ? logoUrl(r.team) : (r.hs || logoUrl(r.team))}
-                        alt={r.team} width={30} height={30}
-                        className="object-contain rounded-full shrink-0"
-                        style={{ width: 30, height: 30, background: "#fff" }} loading="lazy"
-                      />
-                      <span className="hidden sm:inline">{r.name}</span>
-                      <span className="sm:hidden">{r.name.split(" ").slice(-1)[0]}</span>
-                    </span>
-                  </td>
-                  <td className="lft text-s-muted">{r.pos}</td>
-                  <td className="lft">
-                    <span className="inline-flex items-center gap-1.5">
-                      <img src={logoUrl(r.team)} alt={r.team} width={18} height={18} className="object-contain" loading="lazy" />
-                      <span className="text-2xs text-s-muted">{r.team}</span>
-                    </span>
-                  </td>
-                  <td className="text-s-muted">{r.g}</td>
-                  <td>{r.pts.toFixed(1)}</td>
-                  <td>{r.ppg.toFixed(1)}</td>
-                  <td style={{ color: r.vorp >= 0 ? "var(--color-text)" : "var(--color-muted)" }}>
-                    {r.vorp >= 0 ? "+" : ""}{r.vorp.toFixed(0)}
-                  </td>
-                  <td className="font-bold" style={{ color: warColor(r.war) }}>{r.war.toFixed(2)}</td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr><td className="lft text-s-muted" colSpan={9} style={{ padding: 16 }}>No players match these filters.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <p className="text-2xs text-s-muted mt-2">Data through {FANTASY_UPDATED}. {rows.length} players shown. Tap a player for their yearly WAR.</p>
+      {isProj ? (
+        <>
+          <div className="stat-card !p-0">
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="lft stk stk0">#</th>
+                    <th className="lft stk stk1">Player</th>
+                    <th className="lft">Pos</th>
+                    <th className="lft">Tm</th>
+                    <th onClick={() => clickProj("prev")}>{PROJECTIONS.fromSeason} WAR{projKey === "prev" ? (sortDir === "desc" ? " ↓" : " ↑") : ""}</th>
+                    <th onClick={() => clickProj("proj")}>Proj {PROJ_SEASON} WAR{projKey === "proj" ? (sortDir === "desc" ? " ↓" : " ↑") : ""}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projRows.map((r, i) => (
+                    <tr key={r.id}>
+                      <td className="lft text-s-muted stk stk0">{i + 1}</td>
+                      <td className="lft stk stk1">
+                        <span className="inline-flex items-center gap-2.5 font-semibold">
+                          <img src={r.hs || logoUrl(r.team)} alt={r.team} width={30} height={30}
+                            className="object-contain rounded-full shrink-0" style={{ width: 30, height: 30, background: "#fff" }} loading="lazy" />
+                          <span className="hidden sm:inline">{r.name}</span>
+                          <span className="sm:hidden">{r.name.split(" ").slice(-1)[0]}</span>
+                        </span>
+                      </td>
+                      <td className="lft text-s-muted">{r.pos}</td>
+                      <td className="lft">
+                        <span className="inline-flex items-center gap-1.5">
+                          <img src={logoUrl(r.team)} alt={r.team} width={18} height={18} className="object-contain" loading="lazy" />
+                          <span className="text-2xs text-s-muted">{r.team}</span>
+                        </span>
+                      </td>
+                      <td className="text-s-muted">{r.prev.toFixed(2)}</td>
+                      <td className="font-bold" style={{ color: warColor(r.proj) }}>{r.proj.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  {projRows.length === 0 && (
+                    <tr><td className="lft text-s-muted" colSpan={6} style={{ padding: 16 }}>No players match these filters.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-2xs text-s-muted mt-2">
+            Projected {PROJ_SEASON} WAR — {PROJECTIONS.model.name}, standard scoring (not affected by the settings above).
+            {" "}{projRows.length} players. Rookies aren&apos;t projected (no NFL history yet).
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="stat-card !p-0">
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="lft stk stk0">#</th>
+                    {th("name", "Player", "lft stk stk1")}
+                    {th("pos", "Pos", "lft")}
+                    {th("team", "Tm", "lft")}
+                    {th("g", "G")}
+                    {th("pts", "Pts")}
+                    {th("ppg", "PPG")}
+                    {th("vorp", "VORP")}
+                    {th("war", "WAR")}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={r.id} onClick={() => setSelected(r)} style={{ cursor: "pointer" }}>
+                      <td className="lft text-s-muted stk stk0">{i + 1}</td>
+                      <td className="lft stk stk1">
+                        <span className="inline-flex items-center gap-2.5 font-semibold">
+                          <img
+                            src={r.pos === "DST" ? logoUrl(r.team) : (r.hs || logoUrl(r.team))}
+                            alt={r.team} width={30} height={30}
+                            className="object-contain rounded-full shrink-0"
+                            style={{ width: 30, height: 30, background: "#fff" }} loading="lazy"
+                          />
+                          <span className="hidden sm:inline">{r.name}</span>
+                          <span className="sm:hidden">{r.name.split(" ").slice(-1)[0]}</span>
+                        </span>
+                      </td>
+                      <td className="lft text-s-muted">{r.pos}</td>
+                      <td className="lft">
+                        <span className="inline-flex items-center gap-1.5">
+                          <img src={logoUrl(r.team)} alt={r.team} width={18} height={18} className="object-contain" loading="lazy" />
+                          <span className="text-2xs text-s-muted">{r.team}</span>
+                        </span>
+                      </td>
+                      <td className="text-s-muted">{r.g}</td>
+                      <td>{r.pts.toFixed(1)}</td>
+                      <td>{r.ppg.toFixed(1)}</td>
+                      <td style={{ color: r.vorp >= 0 ? "var(--color-text)" : "var(--color-muted)" }}>
+                        {r.vorp >= 0 ? "+" : ""}{r.vorp.toFixed(0)}
+                      </td>
+                      <td className="font-bold" style={{ color: warColor(r.war) }}>{r.war.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr><td className="lft text-s-muted" colSpan={9} style={{ padding: 16 }}>No players match these filters.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-2xs text-s-muted mt-2">Data through {FANTASY_UPDATED}. {rows.length} players shown. Tap a player for their yearly WAR.</p>
+        </>
+      )}
 
       {selected && detail && (
         <PlayerModal row={selected} seasons={FANTASY_SEASONS} playerWar={detail.playerWar} avgWar={detail.avg} onClose={() => setSelected(null)} />

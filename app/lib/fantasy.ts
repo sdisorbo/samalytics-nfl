@@ -3,6 +3,7 @@
 // fantasy points, replacement level, and WAR — is computed here from the user's
 // league settings, so changing any setting re-ranks the whole table live.
 import fantasy from "../../data/fantasy.json";
+import projections from "../../data/war_projections.json";
 
 export type PlayerRaw = { id: string; name: string; pos: string; team: string; hs: string; w: number[][] };
 export type DstRaw = { team: string; w: number[][] };
@@ -13,6 +14,17 @@ const FILE = fantasy as unknown as FantasyFile;
 export const FANTASY_SEASONS: string[] = FILE.seasons;
 export const FANTASY_UPDATED: string = FILE.updated;
 export const FANTASY_DEFAULT_SEASON: string = FILE.seasons[FILE.seasons.length - 1];
+
+// ── next-season projections (from scripts/war_projection.py, standard scoring) ──
+export type ProjPlayer = { id: string; name: string; pos: string; team: string; hs: string; prev: number; proj: number };
+export type ProjFile = {
+  updated: string; season: number; fromSeason: number;
+  stability: { r: number; slope: number; byPos: Record<string, number>; n: number };
+  model: { name: string; r2: number; mae: number; rho: number; testN: number; trainN: number };
+  players: ProjPlayer[];
+};
+export const PROJECTIONS = projections as unknown as ProjFile;
+export const PROJ_SEASON = String(PROJECTIONS.season);   // e.g. "2026"
 
 // ── settings ─────────────────────────────────────────────────────────────────
 export type Scoring = {
