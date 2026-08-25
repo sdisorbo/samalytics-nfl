@@ -114,11 +114,12 @@ table, .tabular {
 
 /* ── scores ticker (stock-ticker style marquee) ──────────────────────────── */
 .ticker { overflow: hidden; white-space: nowrap; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.ticker:hover { overflow-x: auto; overflow-y: hidden; }   /* scroll it by hand when hovered */
 .ticker-track { display: inline-flex; align-items: center; will-change: transform; animation: ticker-scroll linear infinite; }
 .ticker:hover .ticker-track { animation-play-state: paused; }
 @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
-.tk-item { display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-right: 1px solid var(--color-border);
+.tk-item { display: inline-flex; align-items: center; gap: 7px; padding: 0 22px; border-right: 1px solid var(--color-border);
   font-size: 0.72rem; color: var(--color-muted); height: 30px; }
 .tk-item .tk-abbr { font-weight: 700; color: var(--color-text); }
 .tk-item img { width: 16px; height: 16px; object-fit: contain; }
