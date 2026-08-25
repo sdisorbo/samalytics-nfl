@@ -39,7 +39,7 @@ export default function Ticker() {
     </div>
   );
   // two identical runs so the -50% translate loops seamlessly; ~5s per game (slow)
-  const duration = Math.max(40, games.length * 5);
+  const duration = Math.max(120, games.length * 15);
 
   return (
     <div className="ticker sticky z-40" style={{ top: 48 }}>
