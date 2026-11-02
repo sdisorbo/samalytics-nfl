@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/games", label: "Games" },
   { href: "/elo", label: "Elo Ratings" },
   { href: "/fantasy", label: "Fantasy WAR" },
+  { href: "/trade", label: "Trade Calc" },
 ];
 
 function ThemeToggle() {
