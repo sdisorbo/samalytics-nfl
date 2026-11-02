@@ -145,7 +145,8 @@ export default function FantasyView() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<FantasyRow | null>(null);
   const [projKey, setProjKey] = useState<"proj" | "prev">("proj");
-  const isProj = season === PROJ_SEASON;
+  const showProjOption = Number(PROJ_SEASON) > Number(FANTASY_DEFAULT_SEASON);
+  const isProj = showProjOption && season === PROJ_SEASON;
 
   const setScoring = (patch: Partial<Scoring>) =>
     setSettings((s) => ({ ...s, scoring: { ...s.scoring, ...patch } }));
@@ -232,7 +233,7 @@ export default function FantasyView() {
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <select className="ctl" value={season} onChange={(e) => setSeason(e.target.value)}>
           {FANTASY_SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
-          <option value={PROJ_SEASON}>{PROJ_SEASON} (proj)</option>
+          {showProjOption && <option value={PROJ_SEASON}>{PROJ_SEASON} (proj)</option>}
         </select>
         <div className="flex flex-wrap gap-1">
           {POSITIONS.map((p) => (
