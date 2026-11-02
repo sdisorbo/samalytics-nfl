@@ -89,7 +89,12 @@ function PlayerSearch({ side, other, pool, onAdd }: {
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-s-hover text-left"
               onMouseDown={(e) => { e.preventDefault(); pick(p); }}
             >
-              <img src={logoUrl(p.team)} alt={p.team} className="w-5 h-5 object-contain shrink-0" />
+              <img
+                src={p.pos === "DST" ? logoUrl(p.team) : (p.hs || logoUrl(p.team))}
+                alt={p.name}
+                className={`w-6 h-6 object-cover shrink-0${p.pos !== "DST" ? " rounded-full" : " object-contain"}`}
+                style={p.pos !== "DST" ? { background: "#fff" } : undefined}
+              />
               <span className="flex-1 text-sm font-medium text-s-text truncate">{p.name}</span>
               <span className="text-xs text-s-muted">{p.pos}</span>
               <span className="text-xs font-bold ml-2 tabular-nums" style={{ color: warColor(p.war) }}>
@@ -124,7 +129,12 @@ function SidePanel({ title, players, depthOn, onRemove }: {
             const discounted = mult < 1;
             return (
               <div key={p.id} className="flex items-center gap-2">
-                <img src={logoUrl(p.team)} alt={p.team} className="w-6 h-6 object-contain shrink-0" />
+                <img
+                  src={p.pos === "DST" ? logoUrl(p.team) : (p.hs || logoUrl(p.team))}
+                  alt={p.name}
+                  className={`w-7 h-7 object-cover shrink-0${p.pos !== "DST" ? " rounded-full" : " object-contain"}`}
+                  style={p.pos !== "DST" ? { background: "#fff" } : undefined}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-s-text truncate leading-tight">{p.name}</div>
                   <div className="text-xs text-s-muted">{p.pos} · {p.team}</div>
